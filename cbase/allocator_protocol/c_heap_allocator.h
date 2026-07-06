@@ -1,5 +1,5 @@
-#ifndef C_HEAP_ALLOCATOR_H
-#define C_HEAP_ALLOCATOR_H
+#ifndef AP_HEAP_C_HEAP_ALLOCATOR_H
+#define AP_HEAP_C_HEAP_ALLOCATOR_H
 
 #include <errno.h>
 #include <pthread.h>
@@ -10,16 +10,16 @@
 
 // ========== Configuration ==========
 
-#ifndef DEFAULT_AUTOPAGE_CAPACITY
-#define DEFAULT_AUTOPAGE_CAPACITY (64 * 1024) /* 64 KiB */
+#ifndef AP_HEAP_AUTOPAGE_CAPACITY
+#define AP_HEAP_AUTOPAGE_CAPACITY (64 * 1024) /* 64 KiB */
 #endif
 
-#ifndef MAX_AUTOPAGE_CAPACITY
-#define MAX_AUTOPAGE_CAPACITY (16 * 1024 * 1024) /* 16 MiB */
+#ifndef AP_HEAP_AUTOPAGE_CAPACITY_MAX
+#define AP_HEAP_AUTOPAGE_CAPACITY_MAX (16 * 1024 * 1024) /* 16 MiB */
 #endif
 
-#ifndef DEFAULT_AUTOPAGE_ALIGNMENT
-#define DEFAULT_AUTOPAGE_ALIGNMENT (4 * 1024) /* 4 KiB */
+#ifndef AP_HEAP_AUTOPAGE_ALIGNMENT
+#define AP_HEAP_AUTOPAGE_ALIGNMENT (4 * 1024) /* 4 KiB */
 #endif
 
 // ========== Heap Allocator Structs ==========
@@ -47,19 +47,20 @@ typedef struct heap_allocator {
     size_t                    mapped_pages;
     struct heap_memory_block* free_list;
     struct heap_page*         active_page;
+    size_t                    autopage_capacity;
+    size_t                    autopage_capacity_max;
+    size_t                    autopage_alignment;
 } heap_allocator;
 
 // ========== Utility Functions ==========
-#ifndef C_COMMON_ROUNDUP_UTILS_DEFINED
-#define C_COMMON_ROUNDUP_UTILS_DEFINED
-static inline size_t c_page_roundup(size_t size) {
-    return (size + DEFAULT_AUTOPAGE_ALIGNMENT - 1) & ~(DEFAULT_AUTOPAGE_ALIGNMENT - 1);
+
+static inline size_t c_heap_page_roundup(heap_allocator* allocator, size_t size) {
+    return (size + allocator->autopage_alignment - 1) & ~(allocator->autopage_alignment - 1);
 }
 
-static inline size_t c_block_roundup(size_t size) {
+static inline size_t c_heap_block_roundup(size_t size) {
     return (size + sizeof(void*) - 1) & ~(sizeof(void*) - 1);
 }
-#endif /* C_COMMON_ROUNDUP_UTILS_DEFINED */
 
 static inline void c_heap_page_reclaim(heap_allocator* allocator, heap_page* page) {
     if (!allocator || !page) {
@@ -114,21 +115,21 @@ static inline heap_page* c_heap_allocator_extend(heap_allocator* allocator, size
 
     if (capacity == 0) {
         if (!allocator->active_page) {
-            capacity = DEFAULT_AUTOPAGE_CAPACITY;
+            capacity = allocator->autopage_capacity;
         }
         else {
             size_t prev_cap = allocator->active_page->capacity;
             capacity = prev_cap * 2;
-            if (capacity < DEFAULT_AUTOPAGE_CAPACITY) {
-                capacity = DEFAULT_AUTOPAGE_CAPACITY;
+            if (capacity < allocator->autopage_capacity) {
+                capacity = allocator->autopage_capacity;
             }
-            else if (capacity > MAX_AUTOPAGE_CAPACITY) {
-                capacity = MAX_AUTOPAGE_CAPACITY;
+            else if (capacity > allocator->autopage_capacity_max) {
+                capacity = allocator->autopage_capacity_max;
             }
         }
     }
 
-    size_t     total_capacity = c_page_roundup(capacity);
+    size_t     total_capacity = c_heap_page_roundup(allocator, capacity);
 
     heap_page* page = (heap_page*) calloc(1, total_capacity);
 
@@ -137,7 +138,7 @@ static inline heap_page* c_heap_allocator_extend(heap_allocator* allocator, size
         return NULL;
     }
 
-    page->capacity = capacity;
+    page->capacity = total_capacity;
     page->occupied = sizeof(heap_page);
     page->allocator = allocator;
     page->allocated = NULL;
@@ -163,6 +164,9 @@ static inline heap_allocator* c_heap_allocator_new() {
     allocator->mapped_pages = 0;
     allocator->free_list = NULL;
     allocator->active_page = NULL;
+    allocator->autopage_capacity = AP_HEAP_AUTOPAGE_CAPACITY;
+    allocator->autopage_capacity_max = AP_HEAP_AUTOPAGE_CAPACITY_MAX;
+    allocator->autopage_alignment = AP_HEAP_AUTOPAGE_ALIGNMENT;
 
     return allocator;
 }
@@ -189,7 +193,7 @@ static inline void* c_heap_calloc(heap_allocator* allocator, size_t size, pthrea
         return NULL;
     }
 
-    size_t           cap_net = c_block_roundup(size);
+    size_t           cap_net = c_heap_block_roundup(size);
     size_t           overhead = sizeof(heap_memory_block);
     size_t           cap_total = cap_net + overhead;
 
@@ -213,7 +217,7 @@ static inline void* c_heap_calloc(heap_allocator* allocator, size_t size, pthrea
 
     heap_page* page = allocator->active_page;
     if (!page) {
-        size_t target_cap = DEFAULT_AUTOPAGE_CAPACITY;
+        size_t target_cap = allocator->autopage_capacity;
         while (target_cap < cap_total + sizeof(heap_page)) {
             target_cap *= 2;
         }
@@ -228,10 +232,10 @@ static inline void* c_heap_calloc(heap_allocator* allocator, size_t size, pthrea
     if (page->occupied + cap_total > page->capacity) {
         size_t target_cap = page->capacity;
 
-        if (target_cap < DEFAULT_AUTOPAGE_CAPACITY) {
-            target_cap = DEFAULT_AUTOPAGE_CAPACITY;
+        if (target_cap < allocator->autopage_capacity) {
+            target_cap = allocator->autopage_capacity;
         }
-        else if (target_cap < MAX_AUTOPAGE_CAPACITY) {
+        else if (target_cap < allocator->autopage_capacity_max) {
             target_cap *= 2;
         }
 
@@ -268,7 +272,7 @@ static inline void* c_heap_request(heap_allocator* allocator, size_t size, int s
         return NULL;
     }
 
-    size_t           cap_net = c_block_roundup(size);
+    size_t           cap_net = c_heap_block_roundup(size);
     size_t           overhead = sizeof(heap_memory_block);
     size_t           cap_total = cap_net + overhead;
 
@@ -328,7 +332,7 @@ static inline void* c_heap_request(heap_allocator* allocator, size_t size, int s
         size_t     target_cap;
 
         if (!current) {
-            target_cap = DEFAULT_AUTOPAGE_CAPACITY;
+            target_cap = allocator->autopage_capacity;
             while (target_cap < cap_total + sizeof(heap_page)) {
                 target_cap *= 2;
             }
@@ -337,10 +341,10 @@ static inline void* c_heap_request(heap_allocator* allocator, size_t size, int s
             size_t prev_cap = current->capacity;
             size_t new_cap = prev_cap;
 
-            if (new_cap < DEFAULT_AUTOPAGE_CAPACITY) {
-                new_cap = DEFAULT_AUTOPAGE_CAPACITY;
+            if (new_cap < allocator->autopage_capacity) {
+                new_cap = allocator->autopage_capacity;
             }
-            else if (new_cap < MAX_AUTOPAGE_CAPACITY) {
+            else if (new_cap < allocator->autopage_capacity_max) {
                 new_cap *= 2;
             }
 
@@ -432,4 +436,4 @@ static inline void c_heap_reclaim(heap_allocator* allocator, pthread_mutex_t* lo
     if (locked) pthread_mutex_unlock(lock);
 }
 
-#endif /* C_HEAP_ALLOCATOR_H */
+#endif /* AP_HEAP_C_HEAP_ALLOCATOR_H */
