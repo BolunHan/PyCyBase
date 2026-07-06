@@ -34,11 +34,7 @@
 #endif
 
 #ifndef AP_SHM_ALLOCATOR_PREFIX
-#define AP_SHM_ALLOCATOR_PREFIX "/c_cbase_shm_allocator"
-#endif
-
-#ifndef AP_SHM_PAGE_PREFIX
-#define AP_SHM_PAGE_PREFIX "/c_cbase_shm_page"
+#define AP_SHM_ALLOCATOR_PREFIX "/c_cbase_shm"
 #endif
 
 #ifndef AP_SHM_NAME_LEN
@@ -205,7 +201,7 @@ static inline void c_shm_free(void* ptr, pthread_mutex_t* lock);
 static inline void c_shm_reclaim(shm_allocator_ctx* ctx, pthread_mutex_t* lock);
 
 /**
- * @brief Scan for an allocator SHM name.
+ * @brief Scan for an allocator SHM name (appends "_ac" to prefix).
  * @param shm_prefix Prefix to scan for (NULL for compile-time default).
  * @param out Output buffer for found name.
  * @return 0 on success, -1 on failure.
@@ -213,7 +209,7 @@ static inline void c_shm_reclaim(shm_allocator_ctx* ctx, pthread_mutex_t* lock);
 static inline int c_shm_scan_allocator(const char* shm_prefix, char* out);
 
 /**
- * @brief Scan for a page SHM name.
+ * @brief Scan for a page SHM name (appends "_pg" to prefix).
  * @param shm_prefix Prefix to scan for (NULL for compile-time default).
  * @param out Output buffer for found name.
  * @return 0 on success, -1 on failure.
@@ -260,15 +256,15 @@ static inline size_t c_shm_block_roundup(size_t size) {
 
 static inline void c_shm_allocator_name(const void* region, const char* shm_prefix, char* out) {
     pid_t pid = getpid();
-    // The shm name should be in format of {prefix}_{pid_hex}_{region_hex}
-    snprintf(out, AP_SHM_NAME_LEN, "%s_%lx_%lx", shm_prefix, (long) pid, (unsigned long) (uintptr_t) region);
+    // The shm name should be in format of {prefix}_ac_{pid_hex}_{region_hex}
+    snprintf(out, AP_SHM_NAME_LEN, "%s_ac_%lx_%lx", shm_prefix, (long) pid, (unsigned long) (uintptr_t) region);
 }
 
 static inline void c_shm_page_name(shm_allocator* allocator, char* out) {
     pid_t  pid = getpid();
     size_t page_idx = allocator->mapped_pages;
-    // The shm name should be in format of {prefix}_{pid_hex}_{page_idx_hex}
-    snprintf(out, AP_SHM_NAME_LEN, "%s_%lx_%zx", allocator->shm_prefix, (long) pid, page_idx);
+    // The shm name should be in format of {prefix}_pg_{pid_hex}_{page_idx_hex}
+    snprintf(out, AP_SHM_NAME_LEN, "%s_pg_%lx_%zx", allocator->shm_prefix, (long) pid, page_idx);
 }
 
 static inline int c_shm_scan(const char* prefix, char* out) {
@@ -972,12 +968,16 @@ static inline void c_shm_reclaim(shm_allocator_ctx* ctx, pthread_mutex_t* lock) 
 
 static inline int c_shm_scan_allocator(const char* shm_prefix, char* out) {
     if (!shm_prefix) shm_prefix = AP_SHM_ALLOCATOR_PREFIX;
-    return c_shm_scan(shm_prefix, out);
+    char scan_prefix[AP_SHM_PREFIX_MAX + 4];  // +4 for "_ac\0"
+    snprintf(scan_prefix, sizeof(scan_prefix), "%s_ac", shm_prefix);
+    return c_shm_scan(scan_prefix, out);
 }
 
 static inline int c_shm_scan_page(const char* shm_prefix, char* out) {
-    if (!shm_prefix) shm_prefix = AP_SHM_PAGE_PREFIX;
-    return c_shm_scan(shm_prefix, out);
+    if (!shm_prefix) shm_prefix = AP_SHM_ALLOCATOR_PREFIX;
+    char scan_prefix[AP_SHM_PREFIX_MAX + 4];  // +4 for "_pg\0"
+    snprintf(scan_prefix, sizeof(scan_prefix), "%s_pg", shm_prefix);
+    return c_shm_scan(scan_prefix, out);
 }
 
 static inline pid_t c_shm_pid(const char* shm_name) {
@@ -1045,7 +1045,10 @@ static inline shm_allocator* c_shm_allocator_dangling(const char* shm_prefix, ch
 
     if (!shm_prefix) shm_prefix = AP_SHM_ALLOCATOR_PREFIX;
 
-    const char* fs_prefix = shm_prefix;
+    char scan_prefix[AP_SHM_PREFIX_MAX + 4];
+    snprintf(scan_prefix, sizeof(scan_prefix), "%s_ac", shm_prefix);
+
+    const char* fs_prefix = scan_prefix;
     if (fs_prefix[0] == '/') fs_prefix += 1;
     size_t prefix_len = strlen(fs_prefix);
 
@@ -1116,25 +1119,20 @@ static inline void c_shm_clear_dangling(const char* shm_prefix) {
         return;
     }
 
-    const char* prefixes[2];
-    size_t      prefix_count;
-    if (shm_prefix) {
-        prefixes[0] = shm_prefix;
-        prefix_count = 1;
-    }
-    else {
-        prefixes[0] = AP_SHM_ALLOCATOR_PREFIX;
-        prefixes[1] = AP_SHM_PAGE_PREFIX;
-        prefix_count = 2;
-    }
+    if (!shm_prefix) shm_prefix = AP_SHM_ALLOCATOR_PREFIX;
+
+    const char*    suffixes[] = {"_ac", "_pg"};
+    size_t         suffix_count = 2;
 
     struct dirent* ent = NULL;
     while ((ent = readdir(dir)) != NULL) {
         if (ent->d_name[0] == '.') continue;
 
         int matched = 0;
-        for (size_t i = 0; i < prefix_count; ++i) {
-            const char* p = prefixes[i];
+        for (size_t i = 0; i < suffix_count; ++i) {
+            char full_prefix[AP_SHM_PREFIX_MAX + 4];
+            snprintf(full_prefix, sizeof(full_prefix), "%s%s", shm_prefix, suffixes[i]);
+            const char* p = full_prefix;
             if (p[0] == '/') p += 1;
             size_t len = strlen(p);
             if (strncmp(ent->d_name, p, len) == 0) {
