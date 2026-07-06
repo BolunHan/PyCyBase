@@ -6,9 +6,16 @@ from .c_shm_allocator cimport C_ALLOCATOR as SHM_ALLOCATOR
 
 
 cdef class EnvConfigContext:
-    def __cinit__(self, **kwargs):
-        self.overrides = kwargs
+    def __cinit__(self):
+        self.overrides = {}
         self.originals = {}
+
+    def __init__(self, dict overrides=None, **kwargs):
+        if overrides:
+            self.overrides.update(overrides)
+
+        if kwargs:
+            self.overrides.update(kwargs)
 
     cdef void c_activate(self):
         pass
@@ -46,6 +53,9 @@ cdef class EnvConfigContext:
 
 
 cdef class AllocatorConfigContext(EnvConfigContext):
+    def __cinit__(self):
+        self.allocator_schematic = AP_DEFAULT_ALLOCATOR
+
     cdef AllocatorConfigContext c_bind(self, allocator_protocol* schematic):
         self.allocator_schematic = schematic
         return self
@@ -68,6 +78,30 @@ cdef class AllocatorConfigContext(EnvConfigContext):
             self.originals['freelist'] = self.allocator_schematic.with_freelist
             self.allocator_schematic.with_freelist = self.overrides['freelist']
 
+        if 'autopage_capacity' in self.overrides:
+            if self.allocator_schematic.heap_allocator:
+                self.originals['heap.autopage_capacity'] = self.allocator_schematic.heap_allocator.autopage_capacity
+                self.allocator_schematic.heap_allocator.autopage_capacity = self.overrides['autopage_capacity']
+            if self.allocator_schematic.shm_allocator_ctx and self.allocator_schematic.shm_allocator_ctx.shm_allocator:
+                self.originals['shm.autopage_capacity'] = self.allocator_schematic.shm_allocator_ctx.shm_allocator.autopage_capacity
+                self.allocator_schematic.shm_allocator_ctx.shm_allocator.autopage_capacity = self.overrides['autopage_capacity']
+
+        if 'autopage_capacity_max' in self.overrides:
+            if self.allocator_schematic.heap_allocator:
+                self.originals['heap.autopage_capacity_max'] = self.allocator_schematic.heap_allocator.autopage_capacity_max
+                self.allocator_schematic.heap_allocator.autopage_capacity_max = self.overrides['autopage_capacity_max']
+            if self.allocator_schematic.shm_allocator_ctx and self.allocator_schematic.shm_allocator_ctx.shm_allocator:
+                self.originals['shm.autopage_capacity_max'] = self.allocator_schematic.shm_allocator_ctx.shm_allocator.autopage_capacity_max
+                self.allocator_schematic.shm_allocator_ctx.shm_allocator.autopage_capacity_max = self.overrides['autopage_capacity_max']
+
+        if 'autopage_alignment' in self.overrides:
+            if self.allocator_schematic.heap_allocator:
+                self.originals['heap.autopage_alignment'] = self.allocator_schematic.heap_allocator.autopage_alignment
+                self.allocator_schematic.heap_allocator.autopage_alignment = self.overrides['autopage_alignment']
+            if self.allocator_schematic.shm_allocator_ctx and self.allocator_schematic.shm_allocator_ctx.shm_allocator:
+                self.originals['shm.autopage_alignment'] = self.allocator_schematic.shm_allocator_ctx.shm_allocator.autopage_alignment
+                self.allocator_schematic.shm_allocator_ctx.shm_allocator.autopage_alignment = self.overrides['autopage_alignment']
+
     cdef void c_deactivate(self):
         if not self.allocator_schematic:
             raise RuntimeError(f'<{self.__class__.__name__}> not bound!')
@@ -82,6 +116,24 @@ cdef class AllocatorConfigContext(EnvConfigContext):
 
         if 'freelist' in self.originals:
             self.allocator_schematic.with_freelist = self.originals.pop('freelist')
+
+        if 'heap.autopage_capacity' in self.originals:
+            self.allocator_schematic.heap_allocator.autopage_capacity = self.originals.pop('heap.autopage_capacity')
+
+        if 'shm.autopage_capacity' in self.originals:
+            self.allocator_schematic.shm_allocator_ctx.shm_allocator.autopage_capacity = self.originals.pop('shm.autopage_capacity')
+
+        if 'heap.autopage_capacity_max' in self.originals:
+            self.allocator_schematic.heap_allocator.autopage_capacity_max = self.originals.pop('heap.autopage_capacity_max')
+
+        if 'shm.autopage_capacity_max' in self.originals:
+            self.allocator_schematic.shm_allocator_ctx.shm_allocator.autopage_capacity_max = self.originals.pop('shm.autopage_capacity_max')
+
+        if 'heap.autopage_alignment' in self.originals:
+            self.allocator_schematic.heap_allocator.autopage_alignment = self.originals.pop('heap.autopage_alignment')
+
+        if 'shm.autopage_alignment' in self.originals:
+            self.allocator_schematic.shm_allocator_ctx.shm_allocator.autopage_alignment = self.originals.pop('shm.autopage_alignment')
 
     def __or__(self, EnvConfigContext other):
         cdef dict merged_overrides = self.overrides | other.overrides
@@ -193,13 +245,12 @@ AP_HEAP_ALLOCATOR.shm_allocator_ctx     = NULL
 AP_HEAP_ALLOCATOR.shm_allocator         = NULL
 AP_HEAP_ALLOCATOR.heap_allocator        = HEAP_ALLOCATOR
 
-cdef AllocatorConfigContext AP_SHARED   = AllocatorConfigContext(shared=True).c_bind(AP_DEFAULT_ALLOCATOR)
-cdef AllocatorConfigContext AP_LOCKED   = AllocatorConfigContext(locked=True).c_bind(AP_DEFAULT_ALLOCATOR)
-cdef AllocatorConfigContext AP_LOCKFREE = AllocatorConfigContext(locked=False).c_bind(AP_DEFAULT_ALLOCATOR)
-cdef AllocatorConfigContext AP_FREELIST = AllocatorConfigContext(freelist=True).c_bind(AP_DEFAULT_ALLOCATOR)
+cdef AllocatorConfigContext AP_SHARED   = AllocatorConfigContext(shared=True)
+cdef AllocatorConfigContext AP_LOCKED   = AllocatorConfigContext(locked=True)
+cdef AllocatorConfigContext AP_LOCKFREE = AllocatorConfigContext(locked=False)
+cdef AllocatorConfigContext AP_FREELIST = AllocatorConfigContext(freelist=True)
 
 globals()['AP_SHARED'] = AP_SHARED
 globals()['AP_LOCKED'] = AP_LOCKED
 globals()['AP_LOCKFREE'] = AP_LOCKFREE
 globals()['AP_FREELIST'] = AP_FREELIST
-
