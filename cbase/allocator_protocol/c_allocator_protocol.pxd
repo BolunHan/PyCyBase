@@ -6,8 +6,11 @@ from .c_shm_allocator cimport shm_allocator as shm_allocator_t, shm_allocator_ct
 
 
 cdef extern from "cbase/allocator_protocol/c_allocator_protocol.h":
-    uint8_t AP_ALLOC_VIGILANT
-    uint64_t AP_ALLOC_MAGIC
+    const uint8_t AP_ALLOC_VIGILANT
+    const uint64_t AP_ALLOC_MAGIC
+    const c_bool AP_ALLOC_WITH_LOCK
+    const c_bool AP_ALLOC_WITH_SHM
+    const c_bool AP_ALLOC_WITH_FREELIST
 
     ctypedef struct allocator_protocol:
         shm_allocator_t* shm_allocator
@@ -35,11 +38,6 @@ cdef extern from "cbase/allocator_protocol/c_allocator_protocol.h":
     void* c_ap_realloc(void* src, size_t new_size, allocator_protocol* allocator) noexcept nogil
 
 
-cdef bint AP_CFG_LOCKED
-cdef bint AP_CFG_SHARED
-cdef bint AP_CFG_FREELIST
-
-
 cdef class EnvConfigContext:
     cdef dict overrides
     cdef dict originals
@@ -49,9 +47,10 @@ cdef class EnvConfigContext:
     cdef void c_deactivate(self)
 
 
-cdef EnvConfigContext AP_SHARED
-cdef EnvConfigContext AP_LOCKED
-cdef EnvConfigContext AP_FREELIST
+cdef class AllocatorConfigContext(EnvConfigContext):
+    cdef allocator_protocol* allocator_schematic
+
+    cdef AllocatorConfigContext c_bind(self, allocator_protocol * schematic)
 
 
 cdef class AllocatorProtocol:
@@ -64,3 +63,7 @@ cdef class AllocatorProtocol:
 cdef allocator_protocol* AP_DEFAULT_ALLOCATOR
 cdef allocator_protocol* AP_SHM_ALLOCATOR
 cdef allocator_protocol* AP_HEAP_ALLOCATOR
+
+cdef AllocatorConfigContext AP_SHARED
+cdef AllocatorConfigContext AP_LOCKED
+cdef AllocatorConfigContext AP_FREELIST

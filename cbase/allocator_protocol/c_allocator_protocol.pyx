@@ -4,10 +4,6 @@ from libc.stdlib cimport calloc
 from .c_heap_allocator cimport C_ALLOCATOR as HEAP_ALLOCATOR
 from .c_shm_allocator cimport C_ALLOCATOR as SHM_ALLOCATOR
 
-cdef bint AP_CFG_LOCKED = False
-cdef bint AP_CFG_SHARED = False
-cdef bint AP_CFG_FREELIST = True
-
 
 cdef class EnvConfigContext:
     def __cinit__(self, **kwargs):
@@ -15,38 +11,10 @@ cdef class EnvConfigContext:
         self.originals = {}
 
     cdef void c_activate(self):
-        if 'locked' in self.overrides:
-            global AP_CFG_LOCKED
-            self.originals['locked'] = AP_CFG_LOCKED
-            AP_CFG_LOCKED = self.overrides['locked']
-            AP_DEFAULT_ALLOCATOR.with_lock = AP_CFG_LOCKED
-
-        if 'shared' in self.overrides:
-            global AP_CFG_SHARED
-            self.originals['shared'] = AP_CFG_SHARED
-            AP_CFG_SHARED = self.overrides['shared']
-            AP_DEFAULT_ALLOCATOR.with_shm = AP_CFG_SHARED
-
-        if 'freelist' in self.overrides:
-            global AP_CFG_FREELIST
-            self.originals['freelist'] = AP_CFG_FREELIST
-            AP_CFG_FREELIST = self.overrides['freelist']
-            AP_DEFAULT_ALLOCATOR.with_freelist = AP_CFG_FREELIST
+        pass
 
     cdef void c_deactivate(self):
-        if 'locked' in self.originals:
-            global AP_CFG_LOCKED
-            AP_CFG_LOCKED = self.originals.pop('locked')
-            AP_DEFAULT_ALLOCATOR.with_lock = AP_CFG_LOCKED
-
-        if 'shared' in self.originals:
-            global AP_CFG_SHARED
-            AP_CFG_SHARED = self.originals.pop('shared')
-            AP_DEFAULT_ALLOCATOR.with_shm = AP_CFG_SHARED
-
-        if 'freelist' in self.originals:
-            global AP_CFG_FREELIST
-            AP_CFG_FREELIST = self.originals.pop('freelist')
+        pass
 
     def __repr__(self):
         return f'{self.__class__.__name__}({self.overrides!r})'
@@ -61,14 +29,12 @@ cdef class EnvConfigContext:
     def __or__(self, EnvConfigContext other):
         if not isinstance(other, EnvConfigContext):
             return NotImplemented
-        merged_overrides = self.overrides | other.overrides
-        return EnvConfigContext(**merged_overrides)
+        cdef dict merged_overrides = self.overrides | other.overrides
+        return self.__class__(**merged_overrides)
 
     def __invert__(self):
-        return EnvConfigContext.__new__(
-            EnvConfigContext,
-            **{k: not v if isinstance(v, bool) else v for k, v in self.overrides.items()}
-        )
+        cdef dict inverted_overrides = {k: not v if isinstance(v, bool) else v for k, v in self.overrides.items()}
+        return self.__class__(**inverted_overrides)
 
     def __call__(self, func):
         def wrapper(*args, **kwargs):
@@ -79,27 +45,70 @@ cdef class EnvConfigContext:
         return wrapper
 
 
-cdef EnvConfigContext AP_SHARED     = EnvConfigContext(shared=True)
-cdef EnvConfigContext AP_LOCKED     = EnvConfigContext(locked=True)
-cdef EnvConfigContext AP_FREELIST   = EnvConfigContext(freelist=True)
+cdef class AllocatorConfigContext(EnvConfigContext):
+    cdef AllocatorConfigContext c_bind(self, allocator_protocol* schematic):
+        self.allocator_schematic = schematic
+        return self
 
+    cdef void c_activate(self):
+        if not self.allocator_schematic:
+            raise RuntimeError(f'<{self.__class__.__name__}> not bound!')
 
-globals()['AP_SHARED'] = AP_SHARED
-globals()['AP_LOCKED'] = AP_LOCKED
-globals()['AP_FREELIST'] = AP_FREELIST
+        EnvConfigContext.c_activate(self)
+
+        if 'locked' in self.overrides:
+            self.originals['locked'] = self.allocator_schematic.with_lock
+            self.allocator_schematic.with_lock = self.overrides['locked']
+
+        if 'shared' in self.overrides:
+            self.originals['shared'] = self.allocator_schematic.with_shm
+            self.allocator_schematic.with_shm = self.overrides['shared']
+
+        if 'freelist' in self.overrides:
+            self.originals['freelist'] = self.allocator_schematic.with_freelist
+            self.allocator_schematic.with_freelist = self.overrides['freelist']
+
+    cdef void c_deactivate(self):
+        if not self.allocator_schematic:
+            raise RuntimeError(f'<{self.__class__.__name__}> not bound!')
+
+        EnvConfigContext.c_deactivate(self)
+
+        if 'locked' in self.originals:
+            self.allocator_schematic.with_lock = self.originals.pop('locked')
+
+        if 'shared' in self.originals:
+            self.allocator_schematic.with_shm = self.originals.pop('shared')
+
+        if 'freelist' in self.originals:
+            self.allocator_schematic.with_freelist = self.originals.pop('freelist')
+
+    def __or__(self, EnvConfigContext other):
+        cdef dict merged_overrides = self.overrides | other.overrides
+        cdef AllocatorConfigContext new_config = self.__class__(**merged_overrides)
+        new_config.c_bind(self.allocator_schematic)
+        return new_config
+
+    def __invert__(self):
+        cdef dict inverted_overrides = {k: not v if isinstance(v, bool) else v for k, v in self.overrides.items()}
+        cdef AllocatorConfigContext new_config = self.__class__(**inverted_overrides)
+        new_config.c_bind(self.allocator_schematic)
+        return new_config
 
 
 cdef class AllocatorProtocol:
     def __cinit__(self, size_t size):
         if not size:
             return
-        if AP_CFG_SHARED:
-            self.protocol = c_ap_allocator_protocol_new(size, SHM_ALLOCATOR, NULL, <int> AP_CFG_LOCKED)
-        elif AP_CFG_FREELIST:
-            self.protocol = c_ap_allocator_protocol_new(size, NULL, HEAP_ALLOCATOR, <int> AP_CFG_LOCKED)
+
+        if AP_DEFAULT_ALLOCATOR.with_shm:
+            self.protocol = c_ap_allocator_protocol_new(size, SHM_ALLOCATOR, NULL, AP_DEFAULT_ALLOCATOR.with_lock)
+        elif AP_DEFAULT_ALLOCATOR.with_freelist:
+            self.protocol = c_ap_allocator_protocol_new(size, NULL, HEAP_ALLOCATOR, AP_DEFAULT_ALLOCATOR.with_lock)
         else:
             self.protocol = c_ap_allocator_protocol_new(size, NULL, NULL, 0)
-        if self.protocol != NULL:
+
+        if self.protocol:
             c_ap_allocator_protocol_acquire_owner(self.protocol)
 
     def __dealloc__(self):
@@ -163,9 +172,9 @@ cdef allocator_protocol* AP_DEFAULT_ALLOCATOR   = <allocator_protocol*> calloc(1
 cdef allocator_protocol* AP_SHM_ALLOCATOR       = <allocator_protocol*> calloc(1, sizeof(allocator_protocol))
 cdef allocator_protocol* AP_HEAP_ALLOCATOR      = <allocator_protocol*> calloc(1, sizeof(allocator_protocol))
 
-AP_DEFAULT_ALLOCATOR.with_lock          = AP_CFG_LOCKED
-AP_DEFAULT_ALLOCATOR.with_shm           = AP_CFG_SHARED
-AP_DEFAULT_ALLOCATOR.with_freelist      = AP_CFG_FREELIST
+AP_DEFAULT_ALLOCATOR.with_lock          = AP_ALLOC_WITH_LOCK
+AP_DEFAULT_ALLOCATOR.with_shm           = AP_ALLOC_WITH_SHM
+AP_DEFAULT_ALLOCATOR.with_freelist      = AP_ALLOC_WITH_FREELIST
 AP_DEFAULT_ALLOCATOR.shm_allocator_ctx  = SHM_ALLOCATOR
 AP_DEFAULT_ALLOCATOR.shm_allocator      = SHM_ALLOCATOR.shm_allocator
 AP_DEFAULT_ALLOCATOR.heap_allocator     = HEAP_ALLOCATOR
@@ -183,3 +192,14 @@ AP_HEAP_ALLOCATOR.with_freelist         = True
 AP_HEAP_ALLOCATOR.shm_allocator_ctx     = NULL
 AP_HEAP_ALLOCATOR.shm_allocator         = NULL
 AP_HEAP_ALLOCATOR.heap_allocator        = HEAP_ALLOCATOR
+
+cdef AllocatorConfigContext AP_SHARED   = AllocatorConfigContext(shared=True).c_bind(AP_DEFAULT_ALLOCATOR)
+cdef AllocatorConfigContext AP_LOCKED   = AllocatorConfigContext(locked=True).c_bind(AP_DEFAULT_ALLOCATOR)
+cdef AllocatorConfigContext AP_LOCKFREE = AllocatorConfigContext(locked=False).c_bind(AP_DEFAULT_ALLOCATOR)
+cdef AllocatorConfigContext AP_FREELIST = AllocatorConfigContext(freelist=True).c_bind(AP_DEFAULT_ALLOCATOR)
+
+globals()['AP_SHARED'] = AP_SHARED
+globals()['AP_LOCKED'] = AP_LOCKED
+globals()['AP_LOCKFREE'] = AP_LOCKFREE
+globals()['AP_FREELIST'] = AP_FREELIST
+
