@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools", "wheel", "cython"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "PyCyBase"
+dynamic = ["version"]
+description = "Common C / Cython dual interfaces (allocator protocol, SHM allocator, heap allocator) for Python HFT projects"
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "Han Bolun", email = "Bolun.Han@outlook.com" }]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: POSIX :: Linux",
+]
+
+dependencies = [
+    "cython",
+]
+
+[project.optional-dependencies]
+docs = ["mypy", "sphinx", "sphinx-rtd-theme", "sphinx-autodoc-typehints"]
+
+[project.urls]
+Homepage = "https://github.com/BolunHan/PyCyBase"
+Repository = "https://github.com/BolunHan/PyCyBase"
+Issues = "https://github.com/BolunHan/PyCyBase/issues"
+
+[tool.setuptools.package-data]
+"cbase.allocator_protocol" = ["*.h", "*.c", "*.pyx", "*.pxd", "*.pyi"]
+
+[tool.setuptools.packages.find]
+include = ["cbase*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "cbase.__version__" }

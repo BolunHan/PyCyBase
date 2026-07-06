@@ -1,0 +1,3 @@
+include cbase/allocator_protocol/*.h
+include cbase/allocator_protocol/*.pxd
+include cbase/allocator_protocol/*.pyi
