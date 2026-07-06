@@ -23,11 +23,11 @@ from .c_allocator_protocol cimport (
 )
 
 from .c_heap_allocator cimport (
-    DEFAULT_AUTOPAGE_CAPACITY, MAX_AUTOPAGE_CAPACITY, DEFAULT_AUTOPAGE_ALIGNMENT,
+    AP_HEAP_AUTOPAGE_CAPACITY, AP_HEAP_AUTOPAGE_CAPACITY_MAX, AP_HEAP_AUTOPAGE_ALIGNMENT,
 
     heap_memory_block, heap_page, heap_allocator,
-    c_page_roundup,
-    c_block_roundup,
+    c_heap_page_roundup,
+    c_heap_block_roundup,
     c_heap_page_reclaim,
 
     c_heap_allocator_extend,
