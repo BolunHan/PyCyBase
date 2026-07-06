@@ -22,7 +22,7 @@ class EnvConfigContext:
         """Exit the context, reverting configuration changes."""
         ...
 
-    def __call__(self, func: Callable[[...], Any]) -> Callable[[...], Any]:
+    def __call__(self, func: Callable[..., Any]) -> Callable[..., Any]:
         """Decorator to apply the context to a function."""
         ...
 
@@ -48,23 +48,73 @@ class EnvConfigContext:
         ...
 
 
-AP_SHARED: EnvConfigContext
+class AllocatorConfigContext(EnvConfigContext):
+    """Context manager that extends EnvConfigContext to also dispatch config
+    changes to the underlying heap and shared-memory allocators.
+
+    Accepted keyword arguments (in addition to those inherited):
+
+    * ``locked: bool`` — enable/disable mutex locking
+    * ``shared: bool`` — enable/disable shared memory
+    * ``freelist: bool`` — enable/disable free list
+    * ``autopage_capacity: int`` — propagated to both heap and SHM allocators
+    * ``autopage_capacity_max: int`` — propagated to both heap and SHM allocators
+    * ``autopage_alignment: int`` — propagated to both heap and SHM allocators
+    """
+
+    def __init__(self, **kwargs: Any) -> None:
+        """
+        Initialize the context with configuration changes.
+
+        Args:
+            **kwargs: Configuration key-value pairs to set temporarily
+        """
+        ...
+
+    def __or__(self, other: AllocatorConfigContext) -> AllocatorConfigContext:
+        """
+        Combine two AllocatorConfigContext instances.
+
+        Args:
+            other: Another AllocatorConfigContext instance
+
+        Returns:
+            A new AllocatorConfigContext with combined configurations
+        """
+        ...
+
+    def __invert__(self) -> AllocatorConfigContext:
+        """
+        Invert the AllocatorConfigContext.
+
+        Returns:
+            A new AllocatorConfigContext that reverts the configurations.
+        """
+        ...
+
+
+AP_SHARED: AllocatorConfigContext
 """
-EnvConfigContext instance to set flag for cbase to use SHM allocator.
+AllocatorConfigContext instance to set flag for cbase to use SHM allocator.
 """
 
-AP_LOCKED: EnvConfigContext
+AP_LOCKED: AllocatorConfigContext
 """
-EnvConfigContext instance to set flag for cbase to use thread safe mode.
-"""
-
-AP_FREELIST: EnvConfigContext
-"""
-EnvConfigContext instance to set flag for cbase to use freelist. Have no effect when in AP_SHARED mode, which enforces its own free list.
+AllocatorConfigContext instance to set flag for cbase to use thread safe mode.
 """
 
+AP_LOCKFREE: AllocatorConfigContext
+"""
+AllocatorConfigContext instance to set flag for cbase to disable thread safe mode.
+"""
 
-class AllocatorProtocol(object):
+AP_FREELIST: AllocatorConfigContext
+"""
+AllocatorConfigContext instance to set flag for cbase to use freelist. Have no effect when in AP_SHARED mode, which enforces its own free list.
+"""
+
+
+class AllocatorProtocol:
     """Protocol for memory allocation with environment-based configuration.
 
     Manages an underlying `allocator_protocol` C structure, handling memory
@@ -117,6 +167,15 @@ class AllocatorProtocol(object):
 
         Returns:
             True if locking is enabled, False otherwise.
+        """
+        ...
+
+    @property
+    def with_freelist(self) -> bool:
+        """Indicates if the allocator uses a free list.
+
+        Returns:
+            True if free list is enabled, False otherwise.
         """
         ...
 
