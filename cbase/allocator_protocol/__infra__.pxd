@@ -42,11 +42,11 @@ from .c_heap_allocator cimport (
 )
 
 from .c_shm_allocator cimport (
-    DEFAULT_AUTOPAGE_CAPACITY, MAX_AUTOPAGE_CAPACITY, DEFAULT_AUTOPAGE_ALIGNMENT, SHM_ALLOCATOR_PREFIX, SHM_PAGE_PREFIX, SHM_NAME_LEN, SHM_ALLOCATOR_DEFAULT_REGION_SIZE, c_shm_page_overhead, c_shm_block_overhead,
+    AP_SHM_AUTOPAGE_CAPACITY, AP_SHM_AUTOPAGE_CAPACITY_MAX, AP_SHM_AUTOPAGE_ALIGNMENT, AP_SHM_ALLOCATOR_PREFIX, AP_SHM_NAME_LEN, AP_SHM_PREFIX_MAX, AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE, c_shm_page_overhead, c_shm_block_overhead,
 
     shm_page, shm_page_ctx, shm_memory_block, shm_allocator, shm_allocator_ctx,
-    c_page_roundup,
-    c_block_roundup,
+    c_shm_page_roundup,
+    c_shm_block_roundup,
     c_shm_allocator_name,
     c_shm_page_name,
     c_shm_scan,
