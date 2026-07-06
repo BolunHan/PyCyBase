@@ -1,6 +1,6 @@
 import os
 
-from cpython.unicode cimport PyUnicode_FromString
+from cpython.unicode cimport PyUnicode_FromString, PyUnicode_AsUTF8
 from libc.errno cimport errno
 
 
@@ -120,20 +120,25 @@ cdef class SharedMemoryBlock:
                 return f'{<uintptr_t> self.block.buffer:#0x}'
             return None
 
+    property page_address:
+        def __get__(self):
+            if self.block and self.block.parent_page:
+                return f'{<uintptr_t> self.block.parent_page:#0x}'
+            return None
+
 
 cdef class SharedMemoryAllocator:
-    def __cinit__(self, size_t region_size=0, bint owner=True):
+    def __init__(
+            self,
+            size_t region_size=AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE,
+            str shm_prefix=PyUnicode_FromString(AP_SHM_ALLOCATOR_PREFIX)
+    ):
         if not region_size:
             return
-
-        global ALLOCATOR
-        if ALLOCATOR is not None:
-            raise RuntimeError(f'Global allocator already initialized, Use {ALLOCATOR} instead!')
-        ALLOCATOR = self
-        self.ctx = c_shm_allocator_new(region_size)
+        self.ctx = c_shm_allocator_new(region_size, PyUnicode_AsUTF8(shm_prefix) if shm_prefix else NULL)
         if not self.ctx:
             raise OSError(errno, "Initialize SHM allocator failed")
-        self.owner = owner
+        self.owner = True
 
     def __dealloc__(self):
         if not self.owner:
@@ -144,7 +149,7 @@ cdef class SharedMemoryAllocator:
 
     @staticmethod
     cdef SharedMemoryAllocator c_from_header(shm_allocator_ctx* header, bint owner=False):
-        cdef SharedMemoryAllocator instance = SharedMemoryAllocator.__new__(SharedMemoryAllocator, 0, False)
+        cdef SharedMemoryAllocator instance = SharedMemoryAllocator.__new__(SharedMemoryAllocator)
         instance.ctx = header
         instance.owner = owner
         return instance
@@ -176,8 +181,7 @@ cdef class SharedMemoryAllocator:
 
     @classmethod
     def get_pid(cls, str shm_name):
-        cdef bytes shm_name_bytes = shm_name.encode('utf-8')
-        return c_shm_pid(<char*> shm_name_bytes)
+        return c_shm_pid(PyUnicode_AsUTF8(shm_name))
 
     cpdef SharedMemoryPage extend(self, size_t capacity=0, bint with_lock=True):
         if not self.ctx:
@@ -213,6 +217,8 @@ cdef class SharedMemoryAllocator:
     cpdef void free(self, SharedMemoryBlock buffer, bint with_lock=True):
         if not self.ctx:
             raise RuntimeError(f'Uninitialized <{self.__class__.__name__}>')
+        if not buffer or buffer.block:
+            return
         cdef pthread_mutex_t* lock = &self.ctx.shm_allocator.lock if with_lock else NULL
         c_shm_free(<void*> buffer.block.buffer, lock)
         buffer.owner = False
@@ -224,22 +230,23 @@ cdef class SharedMemoryAllocator:
         cdef pthread_mutex_t* lock = &self.ctx.shm_allocator.lock if with_lock else NULL
         c_shm_reclaim(self.ctx, lock)
 
-    cpdef list dangling(self):
+    cpdef list dangling(self, str shm_prefix=None):
         cdef list out = []
         cdef list entries = os.listdir('/dev/shm')
-        cdef str prefix = PyUnicode_FromString(SHM_ALLOCATOR_PREFIX)
+        cdef str prefix = shm_prefix if shm_prefix else PyUnicode_FromString(AP_SHM_ALLOCATOR_PREFIX)
 
         if prefix.startswith('/'):
             prefix = prefix[1:]
 
-        cdef str shm_name, candidate, pid_str
+        cdef str shm_name, candidate
         cdef pid_t p
         for shm_name in entries:
             if not shm_name.startswith(prefix):
                 continue
             candidate = '/' + shm_name
-            pid_str = shm_name.removeprefix(prefix).split('_')[1]
-            p = <pid_t> int(pid_str)
+            p = c_shm_pid(PyUnicode_AsUTF8(candidate))
+            if p <= 0:
+                continue
             try:
                 os.kill(p, 0)
             except ProcessLookupError:
@@ -250,22 +257,23 @@ cdef class SharedMemoryAllocator:
                 continue
         return out
 
-    cpdef list dangling_pages(self):
+    cpdef list dangling_pages(self, str shm_prefix=None):
         cdef list out = []
         cdef list entries = os.listdir('/dev/shm')
-        cdef str prefix = PyUnicode_FromString(SHM_PAGE_PREFIX)
+        cdef str prefix = shm_prefix if shm_prefix else PyUnicode_FromString(AP_SHM_PAGE_PREFIX)
 
         if prefix.startswith('/'):
             prefix = prefix[1:]
 
-        cdef str shm_name, candidate, pid_str
+        cdef str shm_name, candidate
         cdef pid_t p
         for shm_name in entries:
             if not shm_name.startswith(prefix):
                 continue
             candidate = '/' + shm_name
-            pid_str = shm_name.removeprefix(prefix).split('_')[1]
-            p = <pid_t> int(pid_str)
+            p = c_shm_pid(PyUnicode_AsUTF8(candidate))
+            if p <= 0:
+                continue
             try:
                 os.kill(p, 0)
             except ProcessLookupError:
@@ -276,8 +284,8 @@ cdef class SharedMemoryAllocator:
                 continue
         return out
 
-    cpdef void cleanup_dangling(self):
-        c_shm_clear_dangling()
+    cpdef void cleanup_dangling(self, str shm_prefix=None):
+        c_shm_clear_dangling(PyUnicode_AsUTF8(shm_prefix) if shm_prefix else NULL)
 
     def pages(self):
         if not self.ctx:
@@ -355,20 +363,60 @@ cdef class SharedMemoryAllocator:
                 return None
             return SharedMemoryPage.c_from_header(self.ctx.active_page)
 
+    property autopage_capacity:
+        def __get__(self):
+            if not self.ctx or not self.ctx.shm_allocator:
+                raise RuntimeError(f'Uninitialized <{self.__class__.__name__}>')
+            return <size_t> self.ctx.shm_allocator.autopage_capacity
 
-cdef SharedMemoryAllocator ALLOCATOR = SharedMemoryAllocator(SHM_ALLOCATOR_DEFAULT_REGION_SIZE, True)
+        def __set__(self, size_t value):
+            if not self.ctx or not self.ctx.shm_allocator:
+                raise RuntimeError(f'Uninitialized <{self.__class__.__name__}>')
+            self.ctx.shm_allocator.autopage_capacity = value
+
+    property autopage_capacity_max:
+        def __get__(self):
+            if not self.ctx or not self.ctx.shm_allocator:
+                raise RuntimeError(f'Uninitialized <{self.__class__.__name__}>')
+            return <size_t> self.ctx.shm_allocator.autopage_capacity_max
+
+        def __set__(self, size_t value):
+            if not self.ctx or not self.ctx.shm_allocator:
+                raise RuntimeError(f'Uninitialized <{self.__class__.__name__}>')
+            self.ctx.shm_allocator.autopage_capacity_max = value
+
+    property autopage_alignment:
+        def __get__(self):
+            if not self.ctx or not self.ctx.shm_allocator:
+                raise RuntimeError(f'Uninitialized <{self.__class__.__name__}>')
+            return <size_t> self.ctx.shm_allocator.autopage_alignment
+
+        def __set__(self, size_t value):
+            if not self.ctx or not self.ctx.shm_allocator:
+                raise RuntimeError(f'Uninitialized <{self.__class__.__name__}>')
+            self.ctx.shm_allocator.autopage_alignment = value
+
+    property shm_prefix:
+        def __get__(self) -> str:
+            if not self.ctx or not self.ctx.shm_allocator:
+                return None
+            return PyUnicode_FromString(self.ctx.shm_allocator.shm_prefix)
+
+
+cdef SharedMemoryAllocator ALLOCATOR = SharedMemoryAllocator()
 ALLOCATOR.owner = False
 cdef shm_allocator_ctx* C_ALLOCATOR = ALLOCATOR.ctx
 
 
 globals()['ALLOCATOR'] = ALLOCATOR
-globals()['DEFAULT_AUTOPAGE_CAPACITY'] = DEFAULT_AUTOPAGE_CAPACITY
-globals()['MAX_AUTOPAGE_CAPACITY'] = MAX_AUTOPAGE_CAPACITY
-globals()['DEFAULT_AUTOPAGE_ALIGNMENT'] = DEFAULT_AUTOPAGE_ALIGNMENT
-globals()['SHM_ALLOCATOR_PREFIX'] = PyUnicode_FromString(SHM_ALLOCATOR_PREFIX)
-globals()['SHM_PAGE_PREFIX'] = PyUnicode_FromString(SHM_PAGE_PREFIX)
-globals()['SHM_NAME_LEN'] = SHM_NAME_LEN
-globals()['SHM_ALLOCATOR_DEFAULT_REGION_SIZE'] = SHM_ALLOCATOR_DEFAULT_REGION_SIZE
+globals()['AP_SHM_AUTOPAGE_CAPACITY'] = AP_SHM_AUTOPAGE_CAPACITY
+globals()['AP_SHM_AUTOPAGE_CAPACITY_MAX'] = AP_SHM_AUTOPAGE_CAPACITY_MAX
+globals()['AP_SHM_AUTOPAGE_ALIGNMENT'] = AP_SHM_AUTOPAGE_ALIGNMENT
+globals()['AP_SHM_ALLOCATOR_PREFIX'] = PyUnicode_FromString(AP_SHM_ALLOCATOR_PREFIX)
+globals()['AP_SHM_PAGE_PREFIX'] = PyUnicode_FromString(AP_SHM_PAGE_PREFIX)
+globals()['AP_SHM_NAME_LEN'] = AP_SHM_NAME_LEN
+globals()['AP_SHM_PREFIX_MAX'] = AP_SHM_PREFIX_MAX
+globals()['AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE'] = AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE
 
 
 def cleanup():
@@ -376,7 +424,7 @@ def cleanup():
     ALLOCATOR.owner = True
     globals()['ALLOCATOR'] = ALLOCATOR = None
     C_ALLOCATOR = NULL
-    c_shm_clear_dangling()
+    c_shm_clear_dangling(NULL)
 
 
 import atexit
