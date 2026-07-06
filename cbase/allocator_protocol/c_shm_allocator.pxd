@@ -17,7 +17,6 @@ cdef extern from "cbase/allocator_protocol/c_shm_allocator.h":
     const size_t AP_SHM_AUTOPAGE_CAPACITY_MAX
     const size_t AP_SHM_AUTOPAGE_ALIGNMENT
     const char* AP_SHM_ALLOCATOR_PREFIX
-    const char* AP_SHM_PAGE_PREFIX
     const size_t AP_SHM_NAME_LEN
     const size_t AP_SHM_PREFIX_MAX
     const size_t AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE

@@ -14,6 +14,9 @@ cdef class SharedMemoryPage:
         instance.ctx = header
         return instance
 
+    def __bool__(self):
+        return self.ctx is not NULL
+
     def __repr__(self):
         if self.ctx and self.ctx.shm_page:
             return f"<{self.__class__.__name__}>(name={self.name}, capacity={self.capacity:,}, occupied={self.occupied:,})>"
@@ -56,6 +59,12 @@ cdef class SharedMemoryPage:
             if self.ctx and self.ctx.shm_page:
                 return <size_t> self.ctx.shm_page.occupied
             return 0
+
+    property address:
+        def __get__(self):
+            if self.ctx:
+                return f'{<uintptr_t> self.ctx:#0x}'
+            return None
 
 
 cdef class SharedMemoryBlock:
@@ -217,7 +226,7 @@ cdef class SharedMemoryAllocator:
     cpdef void free(self, SharedMemoryBlock buffer, bint with_lock=True):
         if not self.ctx:
             raise RuntimeError(f'Uninitialized <{self.__class__.__name__}>')
-        if not buffer or buffer.block:
+        if not buffer or not buffer.block:
             return
         cdef pthread_mutex_t* lock = &self.ctx.shm_allocator.lock if with_lock else NULL
         c_shm_free(<void*> buffer.block.buffer, lock)
@@ -234,6 +243,7 @@ cdef class SharedMemoryAllocator:
         cdef list out = []
         cdef list entries = os.listdir('/dev/shm')
         cdef str prefix = shm_prefix if shm_prefix else PyUnicode_FromString(AP_SHM_ALLOCATOR_PREFIX)
+        prefix = prefix + '_ac'
 
         if prefix.startswith('/'):
             prefix = prefix[1:]
@@ -260,7 +270,8 @@ cdef class SharedMemoryAllocator:
     cpdef list dangling_pages(self, str shm_prefix=None):
         cdef list out = []
         cdef list entries = os.listdir('/dev/shm')
-        cdef str prefix = shm_prefix if shm_prefix else PyUnicode_FromString(AP_SHM_PAGE_PREFIX)
+        cdef str prefix = shm_prefix if shm_prefix else PyUnicode_FromString(AP_SHM_ALLOCATOR_PREFIX)
+        prefix = prefix + '_pg'
 
         if prefix.startswith('/'):
             prefix = prefix[1:]
@@ -413,7 +424,6 @@ globals()['AP_SHM_AUTOPAGE_CAPACITY'] = AP_SHM_AUTOPAGE_CAPACITY
 globals()['AP_SHM_AUTOPAGE_CAPACITY_MAX'] = AP_SHM_AUTOPAGE_CAPACITY_MAX
 globals()['AP_SHM_AUTOPAGE_ALIGNMENT'] = AP_SHM_AUTOPAGE_ALIGNMENT
 globals()['AP_SHM_ALLOCATOR_PREFIX'] = PyUnicode_FromString(AP_SHM_ALLOCATOR_PREFIX)
-globals()['AP_SHM_PAGE_PREFIX'] = PyUnicode_FromString(AP_SHM_PAGE_PREFIX)
 globals()['AP_SHM_NAME_LEN'] = AP_SHM_NAME_LEN
 globals()['AP_SHM_PREFIX_MAX'] = AP_SHM_PREFIX_MAX
 globals()['AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE'] = AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE
