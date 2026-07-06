@@ -9,9 +9,9 @@ cdef extern from "pthread.h":
 
 
 cdef extern from "cbase/allocator_protocol/c_heap_allocator.h":
-    const size_t DEFAULT_AUTOPAGE_CAPACITY
-    const size_t MAX_AUTOPAGE_CAPACITY
-    const size_t DEFAULT_AUTOPAGE_ALIGNMENT
+    const size_t AP_HEAP_AUTOPAGE_CAPACITY
+    const size_t AP_HEAP_AUTOPAGE_CAPACITY_MAX
+    const size_t AP_HEAP_AUTOPAGE_ALIGNMENT
 
     ctypedef struct heap_memory_block:
         size_t capacity
@@ -34,9 +34,12 @@ cdef extern from "cbase/allocator_protocol/c_heap_allocator.h":
         size_t mapped_pages
         heap_memory_block* free_list
         heap_page* active_page
+        size_t autopage_capacity
+        size_t autopage_capacity_max
+        size_t autopage_alignment
 
-    size_t c_page_roundup(size_t size)
-    size_t c_block_roundup(size_t size)
+    size_t c_heap_page_roundup(heap_allocator* allocator, size_t size)
+    size_t c_heap_block_roundup(size_t size)
     void c_heap_page_reclaim(heap_allocator* allocator, heap_page* page)
 
     heap_page* c_heap_allocator_extend(heap_allocator* allocator, size_t capacity, pthread_mutex_t* lock)

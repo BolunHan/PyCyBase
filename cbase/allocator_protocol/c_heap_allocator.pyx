@@ -54,6 +54,12 @@ cdef class HeapMemoryPage:
                 return None
             return HeapAllocator.c_from_header(self.page.allocator, False)
 
+    property address:
+        def __get__(self):
+            if not self.page:
+                return None
+            return f"{<uintptr_t> self.page.buffer:#0x}"
+
 
 cdef class HeapMemoryBlock:
     def __cinit__(self, uintptr_t block=0, bint owner=False):
@@ -123,19 +129,11 @@ cdef class HeapMemoryBlock:
 
 
 cdef class HeapAllocator:
-    def __cinit__(self, bint owner=True):
-        self.owner = owner
-        if not owner:
-            return
-
-        global ALLOCATOR
-        if ALLOCATOR is not None:
-            raise RuntimeError(f'Global allocator already initialized, Use {ALLOCATOR} instead!')
-
-        ALLOCATOR = self
+    def __init__(self):
         self.allocator = c_heap_allocator_new()
         if not self.allocator:
             raise OSError(errno, "Initialize heap allocator failed")
+        self.owner = True
 
     def __dealloc__(self):
         if not self.owner:
@@ -146,7 +144,7 @@ cdef class HeapAllocator:
 
     @staticmethod
     cdef HeapAllocator c_from_header(heap_allocator* header, bint owner=False):
-        cdef HeapAllocator instance = HeapAllocator.__new__(HeapAllocator, False)
+        cdef HeapAllocator instance = HeapAllocator.__new__(HeapAllocator)
         instance.allocator = header
         instance.owner = owner
         return instance
@@ -247,21 +245,56 @@ cdef class HeapAllocator:
     property mapped_pages:
         def __get__(self):
             if not self.allocator:
-                return 0
+                raise RuntimeError(f'Uninitialized <{self.__class__.__name__}>')
             return <size_t> self.allocator.mapped_pages
 
     property active_page:
         def __get__(self):
-            if not self.allocator or not self.allocator.active_page:
+            if not self.allocator:
+                raise RuntimeError(f'Uninitialized <{self.__class__.__name__}> or no active page')
+            elif not self.allocator.active_page:
                 return None
             return HeapMemoryPage.c_from_header(self.allocator.active_page)
 
+    property autopage_capacity:
+        def __get__(self):
+            if not self.allocator:
+                raise RuntimeError(f'Uninitialized <{self.__class__.__name__}>')
+            return <size_t> self.allocator.autopage_capacity
 
-cdef HeapAllocator ALLOCATOR = HeapAllocator(True)
+        def __set__(self, size_t value):
+            if not self.allocator:
+                raise RuntimeError(f'Uninitialized <{self.__class__.__name__}>')
+            self.allocator.autopage_capacity = value
+
+    property autopage_capacity_max:
+        def __get__(self):
+            if not self.allocator:
+                raise RuntimeError(f'Uninitialized <{self.__class__.__name__}>')
+            return <size_t> self.allocator.autopage_capacity_max
+
+        def __set__(self, size_t value):
+            if not self.allocator:
+                raise RuntimeError(f'Uninitialized <{self.__class__.__name__}>')
+            self.allocator.autopage_capacity_max = value
+
+    property autopage_alignment:
+        def __get__(self):
+            if not self.allocator:
+                raise RuntimeError(f'Uninitialized <{self.__class__.__name__}>')
+            return <size_t> self.allocator.autopage_alignment
+
+        def __set__(self, size_t value):
+            if not self.allocator:
+                raise RuntimeError(f'Uninitialized <{self.__class__.__name__}>')
+            self.allocator.autopage_alignment = value
+
+
+cdef HeapAllocator ALLOCATOR = HeapAllocator()
 ALLOCATOR.owner = False
 cdef heap_allocator* C_ALLOCATOR = ALLOCATOR.allocator
 
 globals()['ALLOCATOR'] = ALLOCATOR
-globals()['DEFAULT_AUTOPAGE_CAPACITY'] = DEFAULT_AUTOPAGE_CAPACITY
-globals()['MAX_AUTOPAGE_CAPACITY'] = MAX_AUTOPAGE_CAPACITY
-globals()['DEFAULT_AUTOPAGE_ALIGNMENT'] = DEFAULT_AUTOPAGE_ALIGNMENT
+globals()['DEFAULT_AUTOPAGE_CAPACITY'] = AP_HEAP_AUTOPAGE_CAPACITY
+globals()['MAX_AUTOPAGE_CAPACITY'] = AP_HEAP_AUTOPAGE_CAPACITY_MAX
+globals()['DEFAULT_AUTOPAGE_ALIGNMENT'] = AP_HEAP_AUTOPAGE_ALIGNMENT
