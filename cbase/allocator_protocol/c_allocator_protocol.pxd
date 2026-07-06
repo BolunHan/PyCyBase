@@ -66,4 +66,5 @@ cdef allocator_protocol* AP_HEAP_ALLOCATOR
 
 cdef AllocatorConfigContext AP_SHARED
 cdef AllocatorConfigContext AP_LOCKED
+cdef AllocatorConfigContext AP_LOCKFREE
 cdef AllocatorConfigContext AP_FREELIST

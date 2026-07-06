@@ -15,9 +15,9 @@ from .c_allocator_protocol cimport (
     c_ap_strdup,
     c_ap_realloc,
 
-    AP_CFG_LOCKED, AP_CFG_SHARED, AP_CFG_FREELIST,
-    EnvConfigContext,
-    AP_SHARED, AP_LOCKED, AP_FREELIST,
+    AP_ALLOC_WITH_LOCK, AP_ALLOC_WITH_SHM, AP_ALLOC_WITH_FREELIST,
+    EnvConfigContext, AllocatorConfigContext,
+    AP_SHARED, AP_LOCKED, AP_LOCKFREE, AP_FREELIST,
     AllocatorProtocol,
     AP_DEFAULT_ALLOCATOR, AP_SHM_ALLOCATOR, AP_HEAP_ALLOCATOR
 )
