@@ -1,4 +1,4 @@
-__version__ = '0.10.7'
+__version__ = '0.1.0'
 
 import functools
 import os
