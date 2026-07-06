@@ -17,12 +17,15 @@ from .c_allocator_protocol import (
     AllocatorProtocol,
     AP_FREELIST,
     AP_LOCKED,
+    AP_LOCKFREE,
     AP_SHARED,
-    EnvConfigContext
+    EnvConfigContext,
+    AllocatorConfigContext,
 )
 
 __all__ = [
     'HEAP_ALLOCATOR', 'HeapAllocator', 'HeapMemoryBlock', 'HeapMemoryPage',
     'SHM_ALLOCATOR', 'SharedMemoryAllocator', 'SharedMemoryBlock', 'SharedMemoryPage', 'shm_cleanup',
-    'AllocatorProtocol', 'AP_FREELIST', 'AP_LOCKED', 'AP_SHARED', 'EnvConfigContext'
+    'AllocatorProtocol', 'AP_FREELIST', 'AP_LOCKED', 'AP_LOCKFREE', 'AP_SHARED',
+    'EnvConfigContext', 'AllocatorConfigContext',
 ]
