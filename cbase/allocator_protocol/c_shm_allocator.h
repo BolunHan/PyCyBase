@@ -1,8 +1,8 @@
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
-#ifndef C_SHM_ALLOCATOR_H
-#define C_SHM_ALLOCATOR_H
+#ifndef AP_SHM_C_SHM_ALLOCATOR_H
+#define AP_SHM_C_SHM_ALLOCATOR_H
 
 #include <dirent.h>
 #include <errno.h>
@@ -20,32 +20,37 @@
 #include <unistd.h>
 
 // Configuration
-#ifndef DEFAULT_AUTOPAGE_CAPACITY
-#define DEFAULT_AUTOPAGE_CAPACITY (64 * 1024) /* 64 KiB */
+
+#ifndef AP_SHM_AUTOPAGE_CAPACITY
+#define AP_SHM_AUTOPAGE_CAPACITY (64 * 1024) /* 64 KiB */
 #endif
 
-#ifndef MAX_AUTOPAGE_CAPACITY
-#define MAX_AUTOPAGE_CAPACITY (16 * 1024 * 1024) /* 16 MiB */
+#ifndef AP_SHM_AUTOPAGE_CAPACITY_MAX
+#define AP_SHM_AUTOPAGE_CAPACITY_MAX (16 * 1024 * 1024) /* 16 MiB */
 #endif
 
-#ifndef DEFAULT_AUTOPAGE_ALIGNMENT
-#define DEFAULT_AUTOPAGE_ALIGNMENT (4 * 1024) /* 4 KiB */
+#ifndef AP_SHM_AUTOPAGE_ALIGNMENT
+#define AP_SHM_AUTOPAGE_ALIGNMENT (4 * 1024) /* 4 KiB */
 #endif
 
-#ifndef SHM_ALLOCATOR_PREFIX
-#define SHM_ALLOCATOR_PREFIX "/c_cbase_shm_allocator"
+#ifndef AP_SHM_ALLOCATOR_PREFIX
+#define AP_SHM_ALLOCATOR_PREFIX "/c_cbase_shm_allocator"
 #endif
 
-#ifndef SHM_PAGE_PREFIX
-#define SHM_PAGE_PREFIX "/c_cbase_shm_page"
+#ifndef AP_SHM_PAGE_PREFIX
+#define AP_SHM_PAGE_PREFIX "/c_cbase_shm_page"
 #endif
 
-#ifndef SHM_NAME_LEN
-#define SHM_NAME_LEN 256
+#ifndef AP_SHM_NAME_LEN
+#define AP_SHM_NAME_LEN 256
 #endif
 
-#ifndef SHM_ALLOCATOR_DEFAULT_REGION_SIZE
-#define SHM_ALLOCATOR_DEFAULT_REGION_SIZE (128ULL << 30) /* 128 GiB */
+#ifndef AP_SHM_PREFIX_MAX
+#define AP_SHM_PREFIX_MAX 64
+#endif
+
+#ifndef AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE
+#define AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE (128ULL << 30) /* 128 GiB */
 #endif
 
 typedef struct shm_page {
@@ -54,8 +59,8 @@ typedef struct shm_page {
     size_t                   offset;
     struct shm_allocator*    allocator;
     struct shm_memory_block* allocated;
-    char                     shm_name[SHM_NAME_LEN];
-    char                     prev_name[SHM_NAME_LEN];
+    char                     shm_name[AP_SHM_NAME_LEN];
+    char                     prev_name[AP_SHM_NAME_LEN];
 } shm_page;
 
 typedef struct shm_page_ctx {
@@ -75,15 +80,19 @@ typedef struct shm_memory_block {
 } shm_memory_block;
 
 typedef struct shm_allocator {
-    char              shm_name[SHM_NAME_LEN];
+    char              shm_name[AP_SHM_NAME_LEN];
     size_t            pid;
     pthread_mutex_t   lock;
     uintptr_t         region;
     size_t            region_size;
     size_t            mapped_size;
-    char              active_page[SHM_NAME_LEN];
+    char              active_page[AP_SHM_NAME_LEN];
     size_t            mapped_pages;
     shm_memory_block* free_list;
+    size_t            autopage_capacity;
+    size_t            autopage_capacity_max;
+    size_t            autopage_alignment;
+    char              shm_prefix[AP_SHM_PREFIX_MAX];
 } shm_allocator;
 
 typedef struct shm_allocator_ctx {
@@ -93,19 +102,20 @@ typedef struct shm_allocator_ctx {
 } shm_allocator_ctx;
 
 // ========== Forward Declarations (public API) ==========
+
 /**
- * @brief Round up size to DEFAULT_AUTOPAGE_ALIGNMENT.
+ * @brief Round up size to allocator->autopage_alignment.
  * @param size Requested size in bytes.
  * @return Rounded-up size.
  */
-static size_t c_page_roundup(size_t size);
+static size_t c_shm_page_roundup(shm_allocator* allocator, size_t size);
 
 /**
  * @brief Round up size to pointer alignment.
  * @param size Requested size in bytes.
  * @return Rounded-up size.
  */
-static size_t c_block_roundup(size_t size);
+static size_t c_shm_block_roundup(size_t size);
 
 /**
  * @brief Scan /dev/shm for an entry matching prefix.
@@ -150,9 +160,10 @@ static inline shm_page_ctx* c_shm_allocator_extend(shm_allocator_ctx* ctx, size_
 /**
  * @brief Create a new allocator and reserve address space.
  * @param region_size Virtual region size to reserve (0 for default).
+ * @param shm_prefix Custom SHM name prefix (NULL for compile-time default).
  * @return Allocator context or NULL on failure.
  */
-static inline shm_allocator_ctx* c_shm_allocator_new(size_t region_size);
+static inline shm_allocator_ctx* c_shm_allocator_new(size_t region_size, const char* shm_prefix);
 
 /**
  * @brief Tear down allocator, unmapping pages and unlinking SHM objects.
@@ -195,67 +206,69 @@ static inline void c_shm_reclaim(shm_allocator_ctx* ctx, pthread_mutex_t* lock);
 
 /**
  * @brief Scan for an allocator SHM name.
- * @param shm_name Output buffer for found name.
+ * @param shm_prefix Prefix to scan for (NULL for compile-time default).
+ * @param out Output buffer for found name.
  * @return 0 on success, -1 on failure.
  */
-static inline int c_shm_scan_allocator(char* shm_name);
+static inline int c_shm_scan_allocator(const char* shm_prefix, char* out);
 
 /**
  * @brief Scan for a page SHM name.
- * @param shm_name Output buffer for found name.
+ * @param shm_prefix Prefix to scan for (NULL for compile-time default).
+ * @param out Output buffer for found name.
  * @return 0 on success, -1 on failure.
  */
-static inline int c_shm_scan_page(char* shm_name);
+static inline int c_shm_scan_page(const char* shm_prefix, char* out);
 
 /**
  * @brief Extract pid embedded in allocator/page SHM name.
+ *
+ * The name format is {prefix}_{pid_hex}_{suffix}.  This function locates
+ * the pid by scanning from the right — it is prefix-agnostic.
+ *
  * @param shm_name SHM object name (with or without leading '/').
  * @return pid on success, -1 with errno=EINVAL on parse failure.
  */
-static inline pid_t c_shm_pid(char* shm_name);
+static inline pid_t c_shm_pid(const char* shm_name);
 
 /**
  * @brief Find and map a dangling allocator (whose creator pid is gone).
+ * @param shm_prefix Prefix to scan for (NULL for compile-time default).
  * @param shm_name Output buffer to receive the dangling allocator name.
  * @return Mapped allocator pointer or NULL with errno set.
  */
-static inline shm_allocator* c_shm_allocator_dangling(char* shm_name);
+static inline shm_allocator* c_shm_allocator_dangling(const char* shm_prefix, char* shm_name);
 
 /**
  * @brief Unlink all dangling allocator/page SHM objects.
+ * @param shm_prefix Prefix to scan for (NULL for compile-time defaults).
  */
-static inline void c_shm_clear_dangling();
+static inline void c_shm_clear_dangling(const char* shm_prefix);
 
 // ========== Utility Functions ==========
 
-#ifndef C_COMMON_ROUNDUP_UTILS_DEFINED
-#define C_COMMON_ROUNDUP_UTILS_DEFINED
-static inline size_t c_page_roundup(size_t size) {
-    return (size + DEFAULT_AUTOPAGE_ALIGNMENT - 1) & ~(DEFAULT_AUTOPAGE_ALIGNMENT - 1);
+static const size_t  c_shm_page_overhead = (sizeof(shm_page) + sizeof(void*) - 1) & ~(sizeof(void*) - 1);
+static const size_t  c_shm_block_overhead = (sizeof(shm_memory_block) + sizeof(void*) - 1) & ~(sizeof(void*) - 1);
+
+static inline size_t c_shm_page_roundup(shm_allocator* allocator, size_t size) {
+    return (size + allocator->autopage_alignment - 1) & ~(allocator->autopage_alignment - 1);
 }
 
-static inline size_t c_block_roundup(size_t size) {
+static inline size_t c_shm_block_roundup(size_t size) {
     return (size + sizeof(void*) - 1) & ~(sizeof(void*) - 1);
 }
-#endif /* C_COMMON_ROUNDUP_UTILS_DEFINED */
 
-#ifndef C_SHM_OVERHEAD_CONSTANTS_DEFINED
-#define C_SHM_OVERHEAD_CONSTANTS_DEFINED
-static const size_t c_shm_page_overhead = (sizeof(shm_page) + sizeof(void*) - 1) & ~(sizeof(void*) - 1);
-static const size_t c_shm_block_overhead = (sizeof(shm_memory_block) + sizeof(void*) - 1) & ~(sizeof(void*) - 1);
-#endif /* C_SHM_OVERHEAD_CONSTANTS_DEFINED */
-
-static inline void c_shm_allocator_name(const void* region, char* out) {
+static inline void c_shm_allocator_name(const void* region, const char* shm_prefix, char* out) {
     pid_t pid = getpid();
-    // The shm name should be in format of {prefix}_{pid}_{region_hex}
-    snprintf(out, SHM_NAME_LEN, "%s_%d_%lx", SHM_ALLOCATOR_PREFIX, (int) pid, (uintptr_t) region);
+    // The shm name should be in format of {prefix}_{pid_hex}_{region_hex}
+    snprintf(out, AP_SHM_NAME_LEN, "%s_%lx_%lx", shm_prefix, (long) pid, (unsigned long) (uintptr_t) region);
 }
 
 static inline void c_shm_page_name(shm_allocator* allocator, char* out) {
     pid_t  pid = getpid();
     size_t page_idx = allocator->mapped_pages;
-    // The shm name should be in format of {prefix}_{pid}_{6 digit page_idx}
-    snprintf(out, SHM_NAME_LEN, "%s_%d_%06zu", SHM_PAGE_PREFIX, (int) pid, page_idx);
+    // The shm name should be in format of {prefix}_{pid_hex}_{page_idx_hex}
+    snprintf(out, AP_SHM_NAME_LEN, "%s_%lx_%zx", allocator->shm_prefix, (long) pid, page_idx);
 }
 
 static inline int c_shm_scan(const char* prefix, char* out) {
@@ -285,8 +298,8 @@ static inline int c_shm_scan(const char* prefix, char* out) {
             continue;
         }
 
-        size_t name_len = strnlen(ent->d_name, SHM_NAME_LEN - 1);
-        if (name_len + 2 <= SHM_NAME_LEN) {
+        size_t name_len = strnlen(ent->d_name, AP_SHM_NAME_LEN - 1);
+        if (name_len + 2 <= AP_SHM_NAME_LEN) {
             out[0] = '/';
             memcpy(out + 1, ent->d_name, name_len);
             out[1 + name_len] = '\0';
@@ -384,14 +397,14 @@ static inline int c_shm_page_map(shm_allocator* allocator, shm_page_ctx* page_ct
         page_meta->prev_name[0] = '\0';
     }
     else {
-        memcpy(page_meta->prev_name, allocator->active_page, SHM_NAME_LEN);
-        page_meta->prev_name[SHM_NAME_LEN - 1] = '\0';
+        memcpy(page_meta->prev_name, allocator->active_page, AP_SHM_NAME_LEN);
+        page_meta->prev_name[AP_SHM_NAME_LEN - 1] = '\0';
     }
 
     // Step 4: Update allocator state
     allocator->mapped_size += page_capacity;
-    memcpy(allocator->active_page, page_meta->shm_name, SHM_NAME_LEN);
-    allocator->active_page[SHM_NAME_LEN - 1] = '\0';
+    memcpy(allocator->active_page, page_meta->shm_name, AP_SHM_NAME_LEN);
+    allocator->active_page[AP_SHM_NAME_LEN - 1] = '\0';
     allocator->mapped_pages++;
 
     return 0;
@@ -458,21 +471,21 @@ static inline shm_page_ctx* c_shm_allocator_extend(shm_allocator_ctx* ctx, size_
     // Step 1: Determine new page capacity
     if (capacity == 0) {
         if (!ctx->active_page) {
-            capacity = DEFAULT_AUTOPAGE_CAPACITY;
+            capacity = allocator->autopage_capacity;
         }
         else {
             size_t prev_cap = ctx->active_page->shm_page->capacity;
             capacity = prev_cap * 2;
-            if (capacity < DEFAULT_AUTOPAGE_CAPACITY) {
-                capacity = DEFAULT_AUTOPAGE_CAPACITY;
+            if (capacity < allocator->autopage_capacity) {
+                capacity = allocator->autopage_capacity;
             }
-            else if (capacity > MAX_AUTOPAGE_CAPACITY) {
-                capacity = MAX_AUTOPAGE_CAPACITY;
+            else if (capacity > allocator->autopage_capacity_max) {
+                capacity = allocator->autopage_capacity_max;
             }
         }
     }
 
-    size_t aligned_capacity = c_page_roundup(capacity);
+    size_t aligned_capacity = c_shm_page_roundup(allocator, capacity);
 
     if (aligned_capacity + allocator->mapped_size > allocator->region_size) {
         if (locked) pthread_mutex_unlock(lock);
@@ -506,14 +519,24 @@ static inline shm_page_ctx* c_shm_allocator_extend(shm_allocator_ctx* ctx, size_
     return page_ctx;
 }
 
-static inline shm_allocator_ctx* c_shm_allocator_new(size_t region_size) {
+static inline shm_allocator_ctx* c_shm_allocator_new(size_t region_size, const char* shm_prefix) {
     shm_allocator_ctx* ctx = (shm_allocator_ctx*) calloc(1, sizeof(shm_allocator_ctx));
     if (!ctx) {
         return NULL;
     }
 
+    if (!shm_prefix) {
+        shm_prefix = AP_SHM_ALLOCATOR_PREFIX;
+    }
+
+    size_t prefix_len = strnlen(shm_prefix, AP_SHM_PREFIX_MAX);
+    if (prefix_len >= AP_SHM_PREFIX_MAX) {
+        fprintf(stderr, "c_shm_allocator_new: shm_prefix exceeds AP_SHM_PREFIX_MAX (%zu)\n", (size_t) AP_SHM_PREFIX_MAX);
+        abort();
+    }
+
     if (region_size == 0) {
-        region_size = SHM_ALLOCATOR_DEFAULT_REGION_SIZE;  // 128 GiB
+        region_size = AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE;  // 128 GiB
     }
 
     // Step 1: Reserve virtual address space for the 128 GiB page region
@@ -529,8 +552,8 @@ static inline shm_allocator_ctx* c_shm_allocator_new(size_t region_size) {
     }
 
     // Step 2: Create SHM object for allocator metadata
-    char meta_shm_name[SHM_NAME_LEN];
-    c_shm_allocator_name(virtual_region, meta_shm_name);
+    char meta_shm_name[AP_SHM_NAME_LEN];
+    c_shm_allocator_name(virtual_region, shm_prefix, meta_shm_name);
 
     int meta_fd = shm_open(meta_shm_name, O_CREAT | O_RDWR | O_EXCL, 0600);
     if (meta_fd == -1) {
@@ -561,7 +584,7 @@ static inline shm_allocator_ctx* c_shm_allocator_new(size_t region_size) {
     // Must zero first (mmap doesn't guarantee zeroed memory for ftruncate'd SHM)
     memset(meta, 0, sizeof(shm_allocator));
 
-    size_t name_len = strnlen(meta_shm_name, SHM_NAME_LEN - 1);
+    size_t name_len = strnlen(meta_shm_name, AP_SHM_NAME_LEN - 1);
     memcpy(meta->shm_name, meta_shm_name, name_len);
     meta->shm_name[name_len] = '\0';
     meta->pid = (size_t) getpid();
@@ -570,6 +593,12 @@ static inline shm_allocator_ctx* c_shm_allocator_new(size_t region_size) {
     meta->mapped_size = 0;
     meta->mapped_pages = 0;
     meta->active_page[0] = '\0';
+    meta->autopage_capacity = AP_SHM_AUTOPAGE_CAPACITY;
+    meta->autopage_capacity_max = AP_SHM_AUTOPAGE_CAPACITY_MAX;
+    meta->autopage_alignment = AP_SHM_AUTOPAGE_ALIGNMENT;
+
+    memcpy(meta->shm_prefix, shm_prefix, prefix_len);
+    meta->shm_prefix[prefix_len] = '\0';
 
     // Step 5: Initialize mutex in shared memory with PTHREAD_PROCESS_SHARED
     pthread_mutexattr_t mattr;
@@ -607,7 +636,7 @@ static inline void c_shm_allocator_free(shm_allocator_ctx* ctx) {
         return;
     }
 
-    char shm_name[SHM_NAME_LEN];
+    char shm_name[AP_SHM_NAME_LEN];
 
     // Step 1: Unmap all pages
     shm_page_ctx* page_ctx = ctx->active_page;
@@ -668,7 +697,7 @@ static inline void* c_shm_calloc(shm_allocator_ctx* ctx, size_t size, pthread_mu
         return NULL;
     }
 
-    size_t cap_net = c_block_roundup(size);
+    size_t cap_net = c_shm_block_roundup(size);
     // the overhead is already aligned due to struct padding
     size_t         cap_total = cap_net + c_shm_block_overhead;
     shm_allocator* allocator = ctx->shm_allocator;
@@ -700,8 +729,8 @@ static inline void* c_shm_calloc(shm_allocator_ctx* ctx, size_t size, pthread_mu
     // Step 2: Extend the allocator if there is no active_page or insufficient space
     shm_page_ctx* page_ctx = ctx->active_page;
     if (!page_ctx) {
-        // Step 2.1: Roundup to nearest DEFAULT_AUTOPAGE_CAPACITY * 2^n, for the first page
-        size_t target_cap = DEFAULT_AUTOPAGE_CAPACITY;
+        // Step 2.1: Roundup to nearest allocator->autopage_capacity * 2^n, for the first page
+        size_t target_cap = allocator->autopage_capacity;
         while (target_cap < cap_total + c_shm_page_overhead) {
             target_cap *= 2;
         }
@@ -720,14 +749,14 @@ static inline void* c_shm_calloc(shm_allocator_ctx* ctx, size_t size, pthread_mu
         // Step 2.1: Determine new page capacity
         size_t target_cap = page_meta->capacity;
 
-        if (target_cap < DEFAULT_AUTOPAGE_CAPACITY) {
-            target_cap = DEFAULT_AUTOPAGE_CAPACITY;
+        if (target_cap < allocator->autopage_capacity) {
+            target_cap = allocator->autopage_capacity;
         }
-        else if (target_cap < MAX_AUTOPAGE_CAPACITY) {
+        else if (target_cap < allocator->autopage_capacity_max) {
             target_cap *= 2;
         }
 
-        // Step 2.1: Roundup to nearest DEFAULT_AUTOPAGE_CAPACITY * 2^n, for the first page
+        // Step 2.1: Roundup to nearest allocator->autopage_capacity * 2^n, for the first page
         while (target_cap < cap_total + c_shm_page_overhead) {
             target_cap *= 2;
         }
@@ -767,7 +796,7 @@ static inline void* c_shm_request(shm_allocator_ctx* ctx, size_t size, int scan_
         return NULL;
     }
 
-    size_t           cap_net = c_block_roundup(size);
+    size_t           cap_net = c_shm_block_roundup(size);
     size_t           cap_total = cap_net + c_shm_block_overhead;
     shm_allocator*   allocator = ctx->shm_allocator;
 
@@ -831,7 +860,7 @@ static inline void* c_shm_request(shm_allocator_ctx* ctx, size_t size, int scan_
         size_t        target_cap;
 
         if (!current) {
-            target_cap = DEFAULT_AUTOPAGE_CAPACITY;
+            target_cap = allocator->autopage_capacity;
             while (target_cap < cap_total + c_shm_page_overhead) {
                 target_cap *= 2;
             }
@@ -840,10 +869,10 @@ static inline void* c_shm_request(shm_allocator_ctx* ctx, size_t size, int scan_
             size_t prev_cap = current->shm_page->capacity;
             size_t new_cap = prev_cap;
 
-            if (new_cap < DEFAULT_AUTOPAGE_CAPACITY) {
-                new_cap = DEFAULT_AUTOPAGE_CAPACITY;
+            if (new_cap < allocator->autopage_capacity) {
+                new_cap = allocator->autopage_capacity;
             }
-            else if (new_cap < MAX_AUTOPAGE_CAPACITY) {
+            else if (new_cap < allocator->autopage_capacity_max) {
                 new_cap *= 2;
             }
 
@@ -941,75 +970,66 @@ static inline void c_shm_reclaim(shm_allocator_ctx* ctx, pthread_mutex_t* lock) 
 
 // ========== Internal SHM Management API ==========
 
-static inline int c_shm_scan_allocator(char* shm_name) {
-    return c_shm_scan(SHM_ALLOCATOR_PREFIX, shm_name);
+static inline int c_shm_scan_allocator(const char* shm_prefix, char* out) {
+    if (!shm_prefix) shm_prefix = AP_SHM_ALLOCATOR_PREFIX;
+    return c_shm_scan(shm_prefix, out);
 }
 
-static inline int c_shm_scan_page(char* shm_name) {
-    return c_shm_scan(SHM_PAGE_PREFIX, shm_name);
+static inline int c_shm_scan_page(const char* shm_prefix, char* out) {
+    if (!shm_prefix) shm_prefix = AP_SHM_PAGE_PREFIX;
+    return c_shm_scan(shm_prefix, out);
 }
 
-static inline pid_t c_shm_pid(char* shm_name) {
+static inline pid_t c_shm_pid(const char* shm_name) {
     if (!shm_name) {
         errno = EINVAL;
         return -1;
     }
 
-    const char* prefixes[] = {SHM_ALLOCATOR_PREFIX, SHM_PAGE_PREFIX};
-
     const char* base = shm_name;
     if (base[0] == '/') {
-        base += 1;
+        base++;
     }
 
-    const char* matched_prefix = NULL;
-    for (size_t i = 0; i < sizeof(prefixes) / sizeof(prefixes[0]); ++i) {
-        const char* p = prefixes[i];
-        if (p[0] == '/') p += 1;
-        size_t len = strlen(p);
-        if (strncmp(base, p, len) == 0) {
-            matched_prefix = p;
-            base += len;
-            break;
-        }
-    }
-
-    if (!matched_prefix) {
+    // Name format: {prefix}_{pid_hex}_{suffix}
+    // Walk from the right: find last '_' (suffix separator),
+    // then the '_' before it (pid separator).
+    const char* suffix_us = strrchr(base, '_');
+    if (!suffix_us) {
         errno = EINVAL;
         return -1;
     }
 
-    if (base[0] != '_') {
-        errno = EINVAL;
-        return -1;
+    // Find the underscore that starts the pid segment (rightmost before suffix)
+    const char* pid_us = NULL;
+    for (const char* p = base; p < suffix_us; p++) {
+        if (*p == '_') pid_us = p;
     }
-    base += 1;
-
-    const char* us = strchr(base, '_');
-    if (!us) {
+    if (!pid_us) {
         errno = EINVAL;
         return -1;
     }
 
-    size_t pid_len = (size_t) (us - base);
+    const char* pid_start = pid_us + 1;
+    size_t      pid_len = (size_t) (suffix_us - pid_start);
     if (pid_len == 0 || pid_len >= 32) {
         errno = EINVAL;
         return -1;
     }
 
     char pidbuf[32];
-    memcpy(pidbuf, base, pid_len);
+    memcpy(pidbuf, pid_start, pid_len);
     pidbuf[pid_len] = '\0';
 
     errno = 0;
-    char* endptr = NULL;
-    long  v = strtol(pidbuf, &endptr, 10);
+    char*         endptr = NULL;
+    unsigned long v = strtoul(pidbuf, &endptr, 16);
     if (errno != 0 || endptr == pidbuf || *endptr != '\0') {
         errno = EINVAL;
         return -1;
     }
 
-    if (v <= 0 || v > INT_MAX) {
+    if (v > (unsigned long) INT_MAX) {
         errno = EINVAL;
         return -1;
     }
@@ -1017,13 +1037,15 @@ static inline pid_t c_shm_pid(char* shm_name) {
     return (pid_t) v;
 }
 
-static inline shm_allocator* c_shm_allocator_dangling(char* shm_name) {
+static inline shm_allocator* c_shm_allocator_dangling(const char* shm_prefix, char* shm_name) {
     if (!shm_name) {
         errno = EINVAL;
         return NULL;
     }
 
-    const char* fs_prefix = SHM_ALLOCATOR_PREFIX;
+    if (!shm_prefix) shm_prefix = AP_SHM_ALLOCATOR_PREFIX;
+
+    const char* fs_prefix = shm_prefix;
     if (fs_prefix[0] == '/') fs_prefix += 1;
     size_t prefix_len = strlen(fs_prefix);
 
@@ -1034,14 +1056,14 @@ static inline shm_allocator* c_shm_allocator_dangling(char* shm_name) {
 
     struct dirent* ent = NULL;
     shm_allocator* mapped = NULL;
-    char           candidate[SHM_NAME_LEN];
+    char           candidate[AP_SHM_NAME_LEN];
 
     while ((ent = readdir(dir)) != NULL) {
         if (ent->d_name[0] == '.') continue;
         if (strncmp(ent->d_name, fs_prefix, prefix_len) != 0) continue;
 
-        size_t name_len = strnlen(ent->d_name, SHM_NAME_LEN - 1);
-        if (name_len + 2 > SHM_NAME_LEN) {
+        size_t name_len = strnlen(ent->d_name, AP_SHM_NAME_LEN - 1);
+        if (name_len + 2 > AP_SHM_NAME_LEN) {
             continue;  // would truncate; skip this entry
         }
         candidate[0] = '/';
@@ -1073,8 +1095,8 @@ static inline shm_allocator* c_shm_allocator_dangling(char* shm_name) {
             continue;
         }
 
-        strncpy(shm_name, candidate, SHM_NAME_LEN - 1);
-        shm_name[SHM_NAME_LEN - 1] = '\0';
+        strncpy(shm_name, candidate, AP_SHM_NAME_LEN - 1);
+        shm_name[AP_SHM_NAME_LEN - 1] = '\0';
         mapped = (shm_allocator*) map;
         break;
     }
@@ -1088,14 +1110,23 @@ static inline shm_allocator* c_shm_allocator_dangling(char* shm_name) {
     return mapped;
 }
 
-static inline void c_shm_clear_dangling() {
+static inline void c_shm_clear_dangling(const char* shm_prefix) {
     DIR* dir = opendir("/dev/shm");
     if (!dir) {
         return;
     }
 
-    const char*    prefixes[] = {SHM_ALLOCATOR_PREFIX, SHM_PAGE_PREFIX};
-    size_t         prefix_count = sizeof(prefixes) / sizeof(prefixes[0]);
+    const char* prefixes[2];
+    size_t      prefix_count;
+    if (shm_prefix) {
+        prefixes[0] = shm_prefix;
+        prefix_count = 1;
+    }
+    else {
+        prefixes[0] = AP_SHM_ALLOCATOR_PREFIX;
+        prefixes[1] = AP_SHM_PAGE_PREFIX;
+        prefix_count = 2;
+    }
 
     struct dirent* ent = NULL;
     while ((ent = readdir(dir)) != NULL) {
@@ -1113,9 +1144,9 @@ static inline void c_shm_clear_dangling() {
         }
         if (!matched) continue;
 
-        char   candidate[SHM_NAME_LEN];
-        size_t name_len = strnlen(ent->d_name, SHM_NAME_LEN - 1);
-        if (name_len + 2 > SHM_NAME_LEN) {
+        char   candidate[AP_SHM_NAME_LEN];
+        size_t name_len = strnlen(ent->d_name, AP_SHM_NAME_LEN - 1);
+        if (name_len + 2 > AP_SHM_NAME_LEN) {
             continue;  // would truncate; skip this entry
         }
         candidate[0] = '/';
@@ -1136,4 +1167,4 @@ static inline void c_shm_clear_dangling() {
     closedir(dir);
 }
 
-#endif  // C_SHM_ALLOCATOR_H
+#endif  // AP_SHM_C_SHM_ALLOCATOR_H
