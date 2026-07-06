@@ -12,7 +12,7 @@ cdef extern from "pthread.h":
     int pthread_mutex_destroy(pthread_mutex_t* mutex)
 
 
-cdef extern from "cybase/allocator_protocol/c_shm_allocator.h":
+cdef extern from "cbase/allocator_protocol/c_shm_allocator.h":
     const size_t DEFAULT_AUTOPAGE_CAPACITY
     const size_t MAX_AUTOPAGE_CAPACITY
     const size_t DEFAULT_AUTOPAGE_ALIGNMENT

@@ -50,17 +50,17 @@ class EnvConfigContext:
 
 AP_SHARED: EnvConfigContext
 """
-EnvConfigContext instance to set flag for CyBase to use SHM allocator.
+EnvConfigContext instance to set flag for cbase to use SHM allocator.
 """
 
 AP_LOCKED: EnvConfigContext
 """
-EnvConfigContext instance to set flag for CyBase to use thread safe mode.
+EnvConfigContext instance to set flag for cbase to use thread safe mode.
 """
 
 AP_FREELIST: EnvConfigContext
 """
-EnvConfigContext instance to set flag for CyBase to use freelist. Have no effect when in AP_SHARED mode, which enforces its own free list.
+EnvConfigContext instance to set flag for cbase to use freelist. Have no effect when in AP_SHARED mode, which enforces its own free list.
 """
 
 
