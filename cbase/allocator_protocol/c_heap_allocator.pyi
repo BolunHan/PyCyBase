@@ -1,16 +1,3 @@
-"""Local heap-backed allocator
-
-This module exposes a Python veneer over the in-process heap allocator
-implemented in ``c_heap_allocator``. It mirrors the shared-memory
-allocator API but stores all state in the caller's address space.
-
-Compile-time constants (documented defaults):
-    - DEFAULT_AUTOPAGE_CAPACITY:   64 * 1024        # 64 KiB
-    - MAX_AUTOPAGE_CAPACITY:       16 * 1024 * 1024 # 16 MiB
-    - DEFAULT_AUTOPAGE_ALIGNMENT:  4 * 1024         # 4 KiB
-"""
-from __future__ import annotations
-
 import ctypes
 from collections.abc import Generator
 from dataclasses import dataclass
@@ -91,16 +78,20 @@ class HeapMemoryPage:
         """Currently occupied bytes on the page."""
 
     @property
+    def address(self) -> str | None:
+        """Hex string of the page buffer address."""
+
+    @property
     def allocator(self) -> HeapAllocator | None:
         """Owning allocator wrapper, or None."""
 
 
 class HeapAllocator:
-    """Top-level heap allocator (singleton in practice)."""
+    """Top-level heap allocator."""
 
     owner: bool
 
-    def __init__(self, owner: bool = True) -> None: ...
+    def __init__(self) -> None: ...
 
     def __repr__(self) -> str: ...
 
@@ -141,5 +132,30 @@ class HeapAllocator:
     def active_page(self) -> HeapMemoryPage | None:
         """Most recently mapped page, if any."""
 
+    @property
+    def autopage_capacity(self) -> int:
+        """Default capacity for auto-sized pages (read/write)."""
+
+    @autopage_capacity.setter
+    def autopage_capacity(self, value: int) -> None: ...
+
+    @property
+    def autopage_capacity_max(self) -> int:
+        """Maximum capacity a page can grow to (read/write)."""
+
+    @autopage_capacity_max.setter
+    def autopage_capacity_max(self, value: int) -> None: ...
+
+    @property
+    def autopage_alignment(self) -> int:
+        """Page alignment in bytes (read/write)."""
+
+    @autopage_alignment.setter
+    def autopage_alignment(self, value: int) -> None: ...
+
 
 ALLOCATOR: HeapAllocator
+
+DEFAULT_AUTOPAGE_CAPACITY: int
+MAX_AUTOPAGE_CAPACITY: int
+DEFAULT_AUTOPAGE_ALIGNMENT: int
