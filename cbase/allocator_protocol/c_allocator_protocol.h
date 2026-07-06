@@ -28,6 +28,18 @@
 #define AP_DECREF_AUTOFREE 1
 #endif
 
+#ifndef AP_ALLOC_WITH_LOCK
+#define AP_ALLOC_WITH_LOCK 1
+#endif
+
+#ifndef AP_ALLOC_WITH_SHM
+#define AP_ALLOC_WITH_SHM 0
+#endif
+
+#ifndef AP_ALLOC_WITH_FREELIST
+#define AP_ALLOC_WITH_FREELIST 1
+#endif
+
 // ========== Structs ==========
 
 typedef struct allocator_protocol {
