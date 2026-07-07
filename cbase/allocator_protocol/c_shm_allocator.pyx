@@ -418,7 +418,6 @@ cdef SharedMemoryAllocator ALLOCATOR = SharedMemoryAllocator()
 ALLOCATOR.owner = False
 cdef shm_allocator_ctx* C_ALLOCATOR = ALLOCATOR.ctx
 
-
 globals()['ALLOCATOR'] = ALLOCATOR
 globals()['AP_SHM_AUTOPAGE_CAPACITY'] = AP_SHM_AUTOPAGE_CAPACITY
 globals()['AP_SHM_AUTOPAGE_CAPACITY_MAX'] = AP_SHM_AUTOPAGE_CAPACITY_MAX

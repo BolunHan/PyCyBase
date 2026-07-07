@@ -93,5 +93,6 @@ cdef class HeapAllocator:
 
     cpdef void reclaim(self, bint with_lock=?)
 
+
 cdef HeapAllocator ALLOCATOR
 cdef heap_allocator* C_ALLOCATOR
