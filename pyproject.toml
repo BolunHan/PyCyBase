@@ -29,6 +29,7 @@ Repository = "https://github.com/BolunHan/PyCyBase"
 Issues = "https://github.com/BolunHan/PyCyBase/issues"
 
 [tool.setuptools.package-data]
+"cbase" = ["*.h", "*.c", "*.pyx", "*.pxd", "*.pyi"]
 "cbase.allocator_protocol" = ["*.h", "*.c", "*.pyx", "*.pxd", "*.pyi"]
 
 [tool.setuptools.packages.find]

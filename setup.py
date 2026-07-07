@@ -61,6 +61,7 @@ class BuildExtWithConfig(build_ext):
     def pre_compile(self):
         self.remove_pxd(
             [
+                "cbase",
                 "cbase.allocator_protocol",
             ]
         )
@@ -71,6 +72,7 @@ class BuildExtWithConfig(build_ext):
         # Monkey hack the "__init__.pxd" issue:
         self.inject_pxd(
             [
+                "cbase",
                 "cbase.allocator_protocol",
             ]
         )
@@ -151,6 +153,12 @@ class BuildExtWithConfig(build_ext):
 
 cython_extension.extend(
     [
+        Extension(
+            name="cbase.env",
+            sources=["cbase/env.pyx"],
+            extra_compile_args=COMPILE_FLAGS,
+            include_dirs=[REPO_ROOT]
+        ),
         Extension(
             name="cbase.allocator_protocol.c_heap_allocator",
             sources=["cbase/allocator_protocol/c_heap_allocator.pyx"],
