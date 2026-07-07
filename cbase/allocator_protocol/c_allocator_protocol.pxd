@@ -1,6 +1,8 @@
 from libc.stdint cimport int64_t, uint64_t, uint8_t
 from libcpp cimport bool as c_bool
 
+from cbase.env cimport EnvConfigContext
+
 from .c_heap_allocator cimport heap_allocator as heap_allocator_t
 from .c_shm_allocator cimport shm_allocator as shm_allocator_t, shm_allocator_ctx as shm_allocator_ctx_t
 
@@ -38,19 +40,10 @@ cdef extern from "cbase/allocator_protocol/c_allocator_protocol.h":
     void* c_ap_realloc(void* src, size_t new_size, allocator_protocol* allocator) noexcept nogil
 
 
-cdef class EnvConfigContext:
-    cdef dict overrides
-    cdef dict originals
-
-    cdef void c_activate(self)
-
-    cdef void c_deactivate(self)
-
-
 cdef class AllocatorConfigContext(EnvConfigContext):
     cdef allocator_protocol* allocator_schematic
 
-    cdef AllocatorConfigContext c_bind(self, allocator_protocol * schematic)
+    cdef void c_bind(self, allocator_protocol* schematic=?)
 
 
 cdef class AllocatorProtocol:
