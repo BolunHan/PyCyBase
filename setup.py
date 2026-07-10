@@ -125,6 +125,31 @@ class BuildExtWithConfig(build_ext):
                 with suppress(FileNotFoundError):
                     init_pxd.unlink()
 
+        # Temporarily move the cbase symlink/dir from Cython/Includes
+        # to prevent cythonize from picking up stale pxd files from an
+        # installed version.
+        cls._pxd_backup = []
+        try:
+            import Cython.Includes as _cy_includes
+            includes_dir = Path(next(iter(_cy_includes.__path__)))
+            pkg_link = includes_dir / PACKAGE_NAME
+            if pkg_link.exists():
+                backup = pkg_link.with_name(f"{PACKAGE_NAME}.cy_bak")
+                print(f"[build_py] [pre_compile] Moving Cython/Includes symlink {pkg_link.name} -> {backup.name}")
+                pkg_link.rename(backup)
+                cls._pxd_backup.append((backup, pkg_link))
+        except Exception as e:
+            print(f"[build_py] [pre_compile] Warning: Could not handle Cython/Includes symlink: {e}")
+
+    @classmethod
+    def restore_pxd(cls) -> None:
+        """Restore symlink in Cython/Includes after cythonize."""
+        for backup, original in getattr(cls, '_pxd_backup', []):
+            if backup.exists():
+                print(f"[build_py] [pre_compile] Restoring Cython/Includes symlink {backup.name} -> {original.name}")
+                backup.rename(original)
+        cls._pxd_backup = []
+
     def inject_pxd(self) -> None:
         project_root = Path(__file__).resolve().parent
 
@@ -184,18 +209,21 @@ cython_extension.extend(
 
 BuildExtWithConfig.remove_pxd()
 
-ext_modules.extend(
-    cythonize(
-        cython_extension,
-        annotate=WITH_ANNOTATION,
-        compiler_directives={
-            "language_level": "3",
-            'embedsignature': True
-        },
-        force="--force" in sys.argv,
-        nthreads=N_THREADS,
+try:
+    ext_modules.extend(
+        cythonize(
+            cython_extension,
+            annotate=WITH_ANNOTATION,
+            compiler_directives={
+                "language_level": "3",
+                'embedsignature': True
+            },
+            force="--force" in sys.argv,
+            nthreads=N_THREADS,
+        )
     )
-)
+finally:
+    BuildExtWithConfig.restore_pxd()
 
 # =============================
 # Define C Extensions
