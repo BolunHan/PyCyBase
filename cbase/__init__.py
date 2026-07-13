@@ -12,6 +12,7 @@ def get_include() -> list[str]:
     src_dirs = [
         os.path.realpath(res_dir),
         os.path.realpath(res_dir / 'allocator_protocol'),
+        os.path.realpath(res_dir / 'bytemap'),
     ]
 
     include_root = os.path.realpath(res_dir / 'includes')
