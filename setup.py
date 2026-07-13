@@ -38,6 +38,7 @@ class BuildExtWithConfig(build_ext):
     __cy_modules__ = [
         "cbase",
         "cbase.allocator_protocol",
+        "cbase.bytemap",
     ]
 
     def initialize_options(self):
@@ -201,6 +202,12 @@ cython_extension.extend(
         Extension(
             name="cbase.allocator_protocol.c_allocator_protocol",
             sources=["cbase/allocator_protocol/c_allocator_protocol.pyx"],
+            extra_compile_args=COMPILE_FLAGS,
+            include_dirs=[REPO_ROOT]
+        ),
+        Extension(
+            name="cbase.bytemap.c_bytemap",
+            sources=["cbase/bytemap/c_bytemap.pyx"],
             extra_compile_args=COMPILE_FLAGS,
             include_dirs=[REPO_ROOT]
         ),
