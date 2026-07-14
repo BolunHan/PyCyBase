@@ -7,7 +7,7 @@ from libc.math cimport NAN
 from libc.stdlib cimport calloc, free
 from libc.string cimport memset
 
-from cbase.allocator_protocol cimport AP_DEFAULT_ALLOCATOR
+from cbase.allocator_protocol.c_allocator_protocol cimport AP_DEFAULT_ALLOCATOR
 
 cdef object NO_DEFAULT = object()
 cdef bytes NO_DEFAULT_BYTES = b''

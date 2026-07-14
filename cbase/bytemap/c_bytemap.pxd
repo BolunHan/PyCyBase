@@ -2,7 +2,7 @@ from cpython.object cimport PyObject
 from libc.stdint cimport uint64_t, uintptr_t
 from libcpp cimport bool as c_bool
 
-from cbase.allocator_protocol cimport allocator_protocol
+from cbase.allocator_protocol.c_allocator_protocol cimport allocator_protocol
 
 
 cdef extern from "cbase/bytemap/xxh3.h":
