@@ -1,3 +1,1 @@
-from .c_shm_comp cimport shm_allocator_ctx
-
-cdef shm_allocator_ctx* C_SHM_COMP = NULL
+cdef shm_allocator_ctx* C_SHM_COMP = c_shm_allocator_new(AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE, AP_SHM_ALLOCATOR_PREFIX)
