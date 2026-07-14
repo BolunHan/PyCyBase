@@ -37,17 +37,17 @@ cdef extern from "cbase/allocator_protocol/c_heap_allocator.h":
     int pthread_mutex_unlock(pthread_mutex_t* mutex) noexcept nogil
     int pthread_mutex_destroy(pthread_mutex_t* mutex) noexcept nogil
 
-    size_t c_heap_page_roundup(heap_allocator* allocator, size_t size)
-    size_t c_heap_block_roundup(size_t size)
-    void c_heap_page_reclaim(heap_allocator* allocator, heap_page* page)
+    size_t c_heap_page_roundup(heap_allocator* allocator, size_t size) noexcept nogil
+    size_t c_heap_block_roundup(size_t size) noexcept nogil
+    void c_heap_page_reclaim(heap_allocator* allocator, heap_page* page) noexcept nogil
 
-    heap_page* c_heap_allocator_extend(heap_allocator* allocator, size_t capacity, pthread_mutex_t* lock)
-    heap_allocator* c_heap_allocator_new()
-    void c_heap_allocator_free(heap_allocator* allocator)
-    void* c_heap_calloc(heap_allocator* allocator, size_t size, pthread_mutex_t* lock)
-    void* c_heap_request(heap_allocator* allocator, size_t size, int scan_all_pages, pthread_mutex_t* lock)
-    void c_heap_free(void* ptr, pthread_mutex_t* lock)
-    void c_heap_reclaim(heap_allocator* allocator, pthread_mutex_t* lock)
+    heap_page* c_heap_allocator_extend(heap_allocator* allocator, size_t capacity, pthread_mutex_t* lock) noexcept nogil
+    heap_allocator* c_heap_allocator_new() noexcept nogil
+    void c_heap_allocator_free(heap_allocator* allocator) noexcept nogil
+    void* c_heap_calloc(heap_allocator* allocator, size_t size, pthread_mutex_t* lock) noexcept nogil
+    void* c_heap_request(heap_allocator* allocator, size_t size, int scan_all_pages, pthread_mutex_t* lock) noexcept nogil
+    void c_heap_free(void* ptr, pthread_mutex_t* lock) noexcept nogil
+    void c_heap_reclaim(heap_allocator* allocator, pthread_mutex_t* lock) noexcept nogil
 
 
 cdef class HeapMemoryPage:

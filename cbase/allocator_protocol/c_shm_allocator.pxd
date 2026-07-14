@@ -2,14 +2,14 @@ from libc.stdint cimport uintptr_t
 from posix.unistd cimport pid_t
 
 
-cdef extern from "pthread.h":
+cdef extern from "<pthread.h>":
     ctypedef struct pthread_mutex_t:
         pass  # Opaque type, details handled by C
 
-    int pthread_mutex_init(pthread_mutex_t* mutex, void* attr)
-    int pthread_mutex_lock(pthread_mutex_t* mutex)
-    int pthread_mutex_unlock(pthread_mutex_t* mutex)
-    int pthread_mutex_destroy(pthread_mutex_t* mutex)
+    int pthread_mutex_init(pthread_mutex_t* mutex, void* attr) noexcept nogil
+    int pthread_mutex_lock(pthread_mutex_t* mutex) noexcept nogil
+    int pthread_mutex_unlock(pthread_mutex_t* mutex) noexcept nogil
+    int pthread_mutex_destroy(pthread_mutex_t* mutex) noexcept nogil
 
 
 cdef extern from "cbase/allocator_protocol/c_shm_allocator.h":
@@ -66,27 +66,27 @@ cdef extern from "cbase/allocator_protocol/c_shm_allocator.h":
         int shm_fd
         shm_page_ctx* active_page
 
-    size_t c_shm_page_roundup(shm_allocator* allocator, size_t size)
-    size_t c_shm_block_roundup(size_t size)
-    void c_shm_allocator_name(const void* region, const char* shm_prefix, char* out)
-    void c_shm_page_name(shm_allocator* allocator, char* out)
-    int c_shm_scan(const char* prefix, char* out)
-    shm_page_ctx* c_shm_page_new(size_t page_capacity)
-    int c_shm_page_map(shm_allocator* allocator, shm_page_ctx* page_ctx)
-    void c_shm_page_reclaim(shm_allocator* allocator, shm_page_ctx* page_ctx)
+    size_t c_shm_page_roundup(shm_allocator* allocator, size_t size) noexcept nogil
+    size_t c_shm_block_roundup(size_t size) noexcept nogil
+    void c_shm_allocator_name(const void* region, const char* shm_prefix, char* out) noexcept nogil
+    void c_shm_page_name(shm_allocator* allocator, char* out) noexcept nogil
+    int c_shm_scan(const char* prefix, char* out) noexcept nogil
+    shm_page_ctx* c_shm_page_new(size_t page_capacity) noexcept nogil
+    int c_shm_page_map(shm_allocator* allocator, shm_page_ctx* page_ctx) noexcept nogil
+    void c_shm_page_reclaim(shm_allocator* allocator, shm_page_ctx* page_ctx) noexcept nogil
 
-    shm_page_ctx* c_shm_allocator_extend(shm_allocator_ctx* ctx, size_t capacity, pthread_mutex_t* lock)
-    shm_allocator_ctx* c_shm_allocator_new(size_t region_size, const char* shm_prefix)
-    void c_shm_allocator_free(shm_allocator_ctx* ctx)
-    void* c_shm_calloc(shm_allocator_ctx* ctx, size_t size, pthread_mutex_t* lock)
-    void* c_shm_request(shm_allocator_ctx* ctx, size_t size, int scan_all_pages, pthread_mutex_t* lock)
-    void c_shm_free(void* ptr, pthread_mutex_t* lock)
-    void c_shm_reclaim(shm_allocator_ctx* ctx, pthread_mutex_t* lock)
-    int c_shm_scan_allocator(const char* shm_prefix, char* out)
-    int c_shm_scan_page(const char* shm_prefix, char* out)
-    pid_t c_shm_pid(const char* shm_name)
-    shm_allocator* c_shm_allocator_dangling(const char* shm_prefix, char* shm_name)
-    void c_shm_clear_dangling(const char* shm_prefix)
+    shm_page_ctx* c_shm_allocator_extend(shm_allocator_ctx* ctx, size_t capacity, pthread_mutex_t* lock) noexcept nogil
+    shm_allocator_ctx* c_shm_allocator_new(size_t region_size, const char* shm_prefix) noexcept nogil
+    void c_shm_allocator_free(shm_allocator_ctx* ctx) noexcept nogil
+    void* c_shm_calloc(shm_allocator_ctx* ctx, size_t size, pthread_mutex_t* lock) noexcept nogil
+    void* c_shm_request(shm_allocator_ctx* ctx, size_t size, int scan_all_pages, pthread_mutex_t* lock) noexcept nogil
+    void c_shm_free(void* ptr, pthread_mutex_t* lock) noexcept nogil
+    void c_shm_reclaim(shm_allocator_ctx* ctx, pthread_mutex_t* lock) noexcept nogil
+    int c_shm_scan_allocator(const char* shm_prefix, char* out) noexcept nogil
+    int c_shm_scan_page(const char* shm_prefix, char* out) noexcept nogil
+    pid_t c_shm_pid(const char* shm_name) noexcept nogil
+    shm_allocator* c_shm_allocator_dangling(const char* shm_prefix, char* shm_name) noexcept nogil
+    void c_shm_clear_dangling(const char* shm_prefix) noexcept nogil
 
 
 cdef class SharedMemoryPage:
