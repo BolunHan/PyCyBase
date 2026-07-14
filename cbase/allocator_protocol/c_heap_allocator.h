@@ -2,11 +2,16 @@
 #define AP_HEAP_C_HEAP_ALLOCATOR_H
 
 #include <errno.h>
-#include <pthread.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef _WIN32
+#include "cbase/nt/pthread_nt_compat.h"
+#else
+#include <pthread.h>
+#endif
 
 // ========== Configuration ==========
 

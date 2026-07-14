@@ -1,17 +1,11 @@
-cdef extern from "pthread.h":
-    ctypedef struct pthread_mutex_t:
-        pass
-
-    int pthread_mutex_init(pthread_mutex_t* mutex, void* attr)
-    int pthread_mutex_lock(pthread_mutex_t* mutex)
-    int pthread_mutex_unlock(pthread_mutex_t* mutex)
-    int pthread_mutex_destroy(pthread_mutex_t* mutex)
-
 
 cdef extern from "cbase/allocator_protocol/c_heap_allocator.h":
     const size_t AP_HEAP_AUTOPAGE_CAPACITY
     const size_t AP_HEAP_AUTOPAGE_CAPACITY_MAX
     const size_t AP_HEAP_AUTOPAGE_ALIGNMENT
+
+    ctypedef struct pthread_mutex_t:
+        pass
 
     ctypedef struct heap_memory_block:
         size_t capacity
@@ -37,6 +31,11 @@ cdef extern from "cbase/allocator_protocol/c_heap_allocator.h":
         size_t autopage_capacity
         size_t autopage_capacity_max
         size_t autopage_alignment
+
+    int pthread_mutex_init(pthread_mutex_t* mutex, void* attr) noexcept nogil
+    int pthread_mutex_lock(pthread_mutex_t* mutex) noexcept nogil
+    int pthread_mutex_unlock(pthread_mutex_t* mutex) noexcept nogil
+    int pthread_mutex_destroy(pthread_mutex_t* mutex) noexcept nogil
 
     size_t c_heap_page_roundup(heap_allocator* allocator, size_t size)
     size_t c_heap_block_roundup(size_t size)
