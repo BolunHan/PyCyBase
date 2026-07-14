@@ -1,19 +1,5 @@
-# c_shm_comp.pxd — Cython declarations for the platform-dispatch SHM compat layer.
-#
-# All platform branching happens in c_shm_comp.h (C preprocessor).
-# This .pxd file contains no IF UNAME_SYSNAME conditionals.
-#
-# Type names MUST match the C names in c_shm_comp.h (shm_allocator, shm_allocator_ctx)
-# so that they are the same Cython type as the platform-specific .pxd declarations.
-
 
 cdef extern from "cbase/allocator_protocol/c_shm_comp.h":
-    # -- Types (common subset used by c_allocator_protocol) -------------------
-    #
-    # Type names match the C typedefs — same as c_shm_allocator.h (POSIX)
-    # and the aliases in c_shm_comp.h (Windows).  This ensures they are the
-    # same Cython type as the platform-specific .pxd declarations.
-
     ctypedef struct pthread_mutex_t:
         pass
 
@@ -28,3 +14,6 @@ cdef extern from "cbase/allocator_protocol/c_shm_comp.h":
 
     ctypedef struct shm_allocator_ctx:
         shm_allocator* shm_allocator
+
+
+cdef shm_allocator_ctx* C_SHM_COMP
