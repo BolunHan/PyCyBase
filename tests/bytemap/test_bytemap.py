@@ -3,12 +3,14 @@
 Port of Quark test_07_c_bytemap.py, adapted for PyCyBase.
 """
 import gc
-import math
 import multiprocessing
 import os
+import sys
 import unittest
 
 from cbase.bytemap.c_bytemap import BoundByteMap, BoundByteSet, ByteMap, ByteMapPerformanceTestToolkit
+
+_FORK_AVAILABLE = hasattr(os, 'fork') and sys.platform != 'win32'
 
 
 class TestByteMapCreate(unittest.TestCase):
@@ -673,7 +675,6 @@ class TestByteMapProperties(unittest.TestCase):
         """Test that ByteMap has sizeof(void*) slot capacity."""
         # slot_capacity is a cdef field - verify indirectly
         # by checking we can store and retrieve a pointer value
-        import sys
         value = object()
         self.values.append(value)
         self.bmap['test'] = value
@@ -1155,6 +1156,7 @@ class TestSeqIdMultiprocessSafety(unittest.TestCase):
         sid2 = ByteMapPerformanceTestToolkit.gen_seq_id(addr2)
         self.assertNotEqual(sid1, sid2)
 
+    @unittest.skipUnless(_FORK_AVAILABLE, "fork not available on this platform")
     def test_02_different_process_same_addr_different_seq_id(self):
         """After fork, the same virtual address produces a DIFFERENT seq_id
         because the child has a different PID."""
@@ -1176,8 +1178,9 @@ class TestSeqIdMultiprocessSafety(unittest.TestCase):
         child_sid = queue.get()
 
         self.assertNotEqual(parent_sid, child_sid,
-            f"seq_id collision across processes! parent={parent_sid:#018x} child={child_sid:#018x}")
+                            f"seq_id collision across processes! parent={parent_sid:#018x} child={child_sid:#018x}")
 
+    @unittest.skipUnless(_FORK_AVAILABLE, "fork not available on this platform")
     def test_03_bound_set_self_suppression_after_fork(self):
         """After fork, a BoundByteSet in the child process correctly
         suppresses its own callbacks (no double-adds)."""
@@ -1197,6 +1200,7 @@ class TestSeqIdMultiprocessSafety(unittest.TestCase):
         self.assertEqual(proc.exitcode, 0)
         self.assertEqual(queue.get(), 2)
 
+    @unittest.skipUnless(_FORK_AVAILABLE, "fork not available on this platform")
     def test_04_bound_map_self_suppression_after_fork(self):
         """After fork, a BoundByteMap in the child process correctly
         suppresses its own callbacks (no double-sets)."""
