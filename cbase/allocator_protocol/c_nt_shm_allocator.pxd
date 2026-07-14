@@ -1,17 +1,3 @@
-from libc.stdint cimport uintptr_t
-
-# Windows DWORD type
-cdef extern from "<windows.h>":
-    ctypedef unsigned long DWORD
-
-cdef extern from "cbase/nt/pthread_nt_compat.h":
-    ctypedef struct pthread_mutex_t:
-        pass
-
-    int pthread_mutex_init(pthread_mutex_t* mutex, void* attr)
-    int pthread_mutex_lock(pthread_mutex_t* mutex)
-    int pthread_mutex_unlock(pthread_mutex_t* mutex)
-    int pthread_mutex_destroy(pthread_mutex_t* mutex)
 
 cdef extern from "cbase/allocator_protocol/c_nt_shm_allocator.h":
     const size_t AP_SHM_AUTOPAGE_CAPACITY
@@ -23,6 +9,11 @@ cdef extern from "cbase/allocator_protocol/c_nt_shm_allocator.h":
     const size_t AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE
     const size_t c_nt_shm_page_overhead
     const size_t c_nt_shm_block_overhead
+
+    ctypedef unsigned long DWORD
+
+    ctypedef struct pthread_mutex_t:
+        pass
 
     ctypedef struct nt_shm_page:
         size_t capacity
@@ -66,6 +57,11 @@ cdef extern from "cbase/allocator_protocol/c_nt_shm_allocator.h":
         void* shm_handle
         void* lock_handle
         nt_shm_page_ctx* active_page
+
+    int pthread_mutex_init(pthread_mutex_t* mutex, void* attr)
+    int pthread_mutex_lock(pthread_mutex_t* mutex)
+    int pthread_mutex_unlock(pthread_mutex_t* mutex)
+    int pthread_mutex_destroy(pthread_mutex_t* mutex)
 
     size_t c_nt_shm_page_roundup(nt_shm_allocator* allocator, size_t size)
     size_t c_nt_shm_block_roundup(size_t size)
