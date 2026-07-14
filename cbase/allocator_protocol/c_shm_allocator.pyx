@@ -3,6 +3,8 @@ import os
 from cpython.unicode cimport PyUnicode_FromString, PyUnicode_AsUTF8
 from libc.errno cimport errno
 
+from .c_shm_comp cimport C_SHM_COMP
+
 
 cdef class SharedMemoryPage:
     def __cinit__(self, uintptr_t page_addr=0):
@@ -414,9 +416,9 @@ cdef class SharedMemoryAllocator:
             return PyUnicode_FromString(self.ctx.shm_allocator.shm_prefix)
 
 
-cdef SharedMemoryAllocator ALLOCATOR = SharedMemoryAllocator()
-ALLOCATOR.owner = False
-cdef shm_allocator_ctx* C_ALLOCATOR = ALLOCATOR.ctx
+# Wrap the singleton allocator created by c_shm_comp.pyx.
+cdef SharedMemoryAllocator ALLOCATOR = SharedMemoryAllocator.c_from_header(C_SHM_COMP, False)
+cdef shm_allocator_ctx* C_ALLOCATOR = C_SHM_COMP
 
 globals()['ALLOCATOR'] = ALLOCATOR
 globals()['AP_SHM_AUTOPAGE_CAPACITY'] = AP_SHM_AUTOPAGE_CAPACITY
