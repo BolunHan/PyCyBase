@@ -1,2 +1,3 @@
 /cbase/allocator_protocol/__init__.pxd
 /cbase/bytemap/__init__.pxd
+/cbase/intern_string/__init__.pxd
