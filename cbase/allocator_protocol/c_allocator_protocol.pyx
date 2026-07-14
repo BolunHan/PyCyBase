@@ -2,7 +2,12 @@ from libc.stdint cimport uintptr_t
 from libc.stdlib cimport calloc
 
 from .c_heap_allocator cimport C_ALLOCATOR as HEAP_ALLOCATOR
-from .c_shm_allocator cimport C_ALLOCATOR as SHM_ALLOCATOR
+
+IF UNAME_SYSNAME == "Windows":
+    from .c_nt_shm_allocator cimport nt_shm_allocator_ctx
+    cdef nt_shm_allocator_ctx* SHM_ALLOCATOR = NULL
+ELSE:
+    from .c_shm_allocator cimport C_ALLOCATOR as SHM_ALLOCATOR
 
 
 cdef class AllocatorConfigContext(EnvConfigContext):
@@ -181,14 +186,14 @@ AP_DEFAULT_ALLOCATOR.with_lock          = AP_ALLOC_WITH_LOCK
 AP_DEFAULT_ALLOCATOR.with_shm           = AP_ALLOC_WITH_SHM
 AP_DEFAULT_ALLOCATOR.with_freelist      = AP_ALLOC_WITH_FREELIST
 AP_DEFAULT_ALLOCATOR.shm_allocator_ctx  = SHM_ALLOCATOR
-AP_DEFAULT_ALLOCATOR.shm_allocator      = SHM_ALLOCATOR.shm_allocator
+AP_DEFAULT_ALLOCATOR.shm_allocator      = SHM_ALLOCATOR.shm_allocator if SHM_ALLOCATOR != NULL else NULL
 AP_DEFAULT_ALLOCATOR.heap_allocator     = HEAP_ALLOCATOR
 
 AP_SHM_ALLOCATOR.with_lock              = True
 AP_SHM_ALLOCATOR.with_shm               = True
 AP_SHM_ALLOCATOR.with_freelist          = True
 AP_SHM_ALLOCATOR.shm_allocator_ctx      = SHM_ALLOCATOR
-AP_SHM_ALLOCATOR.shm_allocator          = SHM_ALLOCATOR.shm_allocator
+AP_SHM_ALLOCATOR.shm_allocator          = SHM_ALLOCATOR.shm_allocator if SHM_ALLOCATOR != NULL else NULL
 AP_SHM_ALLOCATOR.heap_allocator         = NULL
 
 AP_HEAP_ALLOCATOR.with_lock             = True
