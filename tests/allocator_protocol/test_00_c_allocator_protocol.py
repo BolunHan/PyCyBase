@@ -23,45 +23,70 @@ _FORK_ALLOC: AllocatorProtocol | None = None
 
 
 class TestAllocatorProtocolBasic(unittest.TestCase):
-    """Test basic AllocatorProtocol functionality (lock state is macro-configurable,
-    so no assertions are made about the default with_lock)."""
+    """Test default AllocatorProtocol (no context manager — plain calloc)."""
 
-    def test_allocator_creation_with_size(self):
-        size = 1024
-        allocator = AllocatorProtocol(size)
-        self.assertEqual(allocator.size, size)
+    def test_creation_with_size(self):
+        allocator = AllocatorProtocol(1024)
+        self.assertEqual(allocator.size, 1024)
 
-    def test_allocator_buffer_access(self):
-        size = 256
-        allocator = AllocatorProtocol(size)
-        buf = allocator.buf
-        buf[0] = b'a'
-        self.assertEqual(buf[0], b'a')
+    def test_buf_length_equals_size(self):
+        allocator = AllocatorProtocol(256)
+        self.assertEqual(len(allocator.buf), 256)
 
-    def test_allocator_buffer_write_read(self):
-        size = 512
-        allocator = AllocatorProtocol(size)
+    def test_buf_is_writable_and_readable(self):
+        allocator = AllocatorProtocol(512)
         buf = allocator.buf
         test_data = b"Hello, AllocatorProtocol!"
         buf[:len(test_data)] = test_data
-        read_data = bytes(buf[:len(test_data)])
-        self.assertEqual(read_data, test_data)
+        self.assertEqual(bytes(buf[:len(test_data)]), test_data)
 
-    def test_allocator_multiple_instances(self):
-        size1, size2 = 256, 512
-        alloc1 = AllocatorProtocol(size1)
-        alloc2 = AllocatorProtocol(size2)
-        self.assertEqual(alloc1.size, size1)
-        self.assertEqual(alloc2.size, size2)
-        alloc1.buf[0] = b'a'
-        alloc2.buf[0] = b'b'
-        self.assertEqual(alloc1.buf[0], b'a')
-        self.assertEqual(alloc2.buf[0], b'b')
+    def test_buf_zero_initialized(self):
+        allocator = AllocatorProtocol(128)
+        self.assertEqual(bytes(allocator.buf[:64]), b'\x00' * 64)
 
-    def test_allocator_zero_size(self):
-        allocator = AllocatorProtocol(0)
+    def test_multiple_instances_independent(self):
+        a1 = AllocatorProtocol(256)
+        a2 = AllocatorProtocol(512)
+        self.assertEqual(a1.size, 256)
+        self.assertEqual(a2.size, 512)
+        a1.buf[0] = b'a'
+        a2.buf[0] = b'b'
+        self.assertEqual(a1.buf[0], b'a')
+        self.assertEqual(a2.buf[0], b'b')
+        self.assertNotEqual(a1.addr, a2.addr)
+
+    def test_addr_is_nonzero_int(self):
+        allocator = AllocatorProtocol(64)
+        self.assertIsInstance(allocator.addr, int)
+        self.assertGreater(allocator.addr, 0)
+
+    def test_default_with_lock_is_bool(self):
+        allocator = AllocatorProtocol(64)
+        self.assertIsInstance(allocator.with_lock, bool)
+
+    def test_default_with_shm_is_false(self):
+        allocator = AllocatorProtocol(64)
+        self.assertFalse(allocator.with_shm)
+
+    def test_default_with_freelist_is_true(self):
+        allocator = AllocatorProtocol(64)
+        self.assertTrue(allocator.with_freelist)
+
+    def test_repr_contains_class_name(self):
+        a = AllocatorProtocol(64)
+        self.assertIn('AllocatorProtocol', repr(a))
+        self.assertIn('size=64', repr(a))
+
+    def test_zero_size_raises_on_property_access(self):
+        a = AllocatorProtocol(0)
         with self.assertRaises(RuntimeError):
-            _ = allocator.size
+            _ = a.size
+        with self.assertRaises(RuntimeError):
+            _ = a.buf
+        with self.assertRaises(RuntimeError):
+            _ = a.addr
+        with self.assertRaises(RuntimeError):
+            _ = a.with_lock
 
 
 class TestAllocatorProtocolWithFreelist(unittest.TestCase):
@@ -69,19 +94,10 @@ class TestAllocatorProtocolWithFreelist(unittest.TestCase):
 
     def test_freelist_mode_basic(self):
         with AP_FREELIST:
-            size = 1024
-            allocator = AllocatorProtocol(size)
-            self.assertEqual(allocator.size, size)
+            allocator = AllocatorProtocol(1024)
+            self.assertEqual(allocator.size, 1024)
+            self.assertTrue(allocator.with_freelist)
             self.assertFalse(allocator.with_shm)
-
-    def test_freelist_mode_buffer_operations(self):
-        with AP_FREELIST:
-            allocator = AllocatorProtocol(512)
-            buf = allocator.buf
-            test_data = b"Freelist mode test"
-            buf[:len(test_data)] = test_data
-            read_data = bytes(buf[:len(test_data)])
-            self.assertEqual(read_data, test_data)
 
     def test_freelist_mode_multiple_allocations(self):
         with AP_FREELIST:
@@ -93,8 +109,40 @@ class TestAllocatorProtocolWithFreelist(unittest.TestCase):
                 allocator.buf[0] = pattern
                 self.assertEqual(allocator.buf[0], pattern)
 
+    def test_freelist_recycle_same_size(self):
+        """After freeing a block, a new allocation of the same size reuses
+        its address and the buffer is zeroed."""
+        with AP_FREELIST:
+            a1 = AllocatorProtocol(256)
+            a2 = AllocatorProtocol(256)
+            addr_1 = a1.addr
+            a1.buf[0] = b'x'
+            del a1
+            a3 = AllocatorProtocol(256)
+            self.assertEqual(a3.addr, addr_1)
+            self.assertEqual(a3.buf[0], b'\0')
+
+    def test_freelist_buffer_zeroed_after_recycle(self):
+        """Recycled buffer is always zero-filled regardless of prior content."""
+        with AP_FREELIST:
+            a1 = AllocatorProtocol(512)
+            a1.buf[:8] = b'\xff' * 8
+            addr_1 = a1.addr
+            del a1
+            a2 = AllocatorProtocol(256)
+            self.assertEqual(a2.addr, addr_1)
+            self.assertEqual(bytes(a2.buf[:8]), b'\x00' * 8)
+
+    def test_freelist_disabled_via_invert(self):
+        """~AP_FREELIST sets with_freelist=False; buffer is plain calloc."""
+        with ~AP_FREELIST:
+            a = AllocatorProtocol(128)
+            self.assertFalse(a.with_freelist)
+            a.buf[:4] = b'\xde\xad\xbe\xef'
+            self.assertEqual(bytes(a.buf[:4]), b'\xde\xad\xbe\xef')
+
     def test_freelist_with_lockfree(self):
-        """AP_FREELIST combined with AP_LOCKFREE explicitly disables locking."""
+        """AP_FREELIST | AP_LOCKFREE → lock off, shm off."""
         with AP_FREELIST | AP_LOCKFREE:
             allocator = AllocatorProtocol(1024)
             self.assertEqual(allocator.size, 1024)
@@ -102,23 +150,20 @@ class TestAllocatorProtocolWithFreelist(unittest.TestCase):
             self.assertFalse(allocator.with_shm)
 
     def test_freelist_with_locked(self):
-        """AP_FREELIST combined with AP_LOCKED explicitly enables locking."""
+        """AP_FREELIST | AP_LOCKED → lock on, shm off."""
         with AP_FREELIST | AP_LOCKED:
             allocator = AllocatorProtocol(1024)
             self.assertEqual(allocator.size, 1024)
             self.assertTrue(allocator.with_lock)
             self.assertFalse(allocator.with_shm)
 
-    def test_freelist_recycle(self):
-        with AP_FREELIST:
-            allocator1 = AllocatorProtocol(256)
-            allocator2 = AllocatorProtocol(256)
-            addr_1 = allocator1.addr
-            allocator1.buf[0] = b'x'
-            del allocator1
-            allocator3 = AllocatorProtocol(256)
-            self.assertEqual(allocator3.addr, addr_1)
-            self.assertEqual(allocator3.buf[0], b'\0')  # always zeroed out
+    def test_freelist_with_shared_shm_takes_precedence(self):
+        """AP_FREELIST | AP_SHARED: shm path wins; with_shm=True, with_freelist
+        remains False on the protocol struct (shm path doesn't set it)."""
+        with AP_FREELIST | AP_SHARED:
+            a = AllocatorProtocol(1024)
+            self.assertTrue(a.with_shm)
+            self.assertFalse(a.with_freelist)
 
 
 class TestAllocatorProtocolWithShared(unittest.TestCase):
@@ -381,45 +426,58 @@ class TestAllocatorProtocolWithShared(unittest.TestCase):
 
 
 class TestAllocatorProtocolLockfree(unittest.TestCase):
-    """Test AP_LOCKFREE context manager."""
+    """Test AP_LOCKFREE / AP_LOCKED context managers."""
 
     def test_lockfree_disables_lock(self):
         with AP_LOCKFREE:
-            allocator = AllocatorProtocol(256)
-            self.assertFalse(allocator.with_lock)
+            a = AllocatorProtocol(256)
+            self.assertFalse(a.with_lock)
+
+    def test_locked_enables_lock(self):
+        with AP_LOCKED:
+            a = AllocatorProtocol(256)
+            self.assertTrue(a.with_lock)
+
+    def test_lockfree_with_shared(self):
+        """AP_LOCKFREE | AP_SHARED → shm on, lock off."""
+        with AP_LOCKFREE | AP_SHARED:
+            a = AllocatorProtocol(128)
+            self.assertTrue(a.with_shm)
+            self.assertFalse(a.with_lock)
+
+    def test_locked_with_shared(self):
+        """AP_LOCKED | AP_SHARED → shm on, lock on."""
+        with AP_LOCKED | AP_SHARED:
+            a = AllocatorProtocol(128)
+            self.assertTrue(a.with_shm)
+            self.assertTrue(a.with_lock)
 
     def test_lockfree_with_freelist(self):
         with AP_LOCKFREE | AP_FREELIST:
-            allocator = AllocatorProtocol(128)
-            self.assertFalse(allocator.with_lock)
-            self.assertFalse(allocator.with_shm)
-
-    def test_lockfree_buffer_operations(self):
-        with AP_LOCKFREE:
-            allocator = AllocatorProtocol(64)
-            allocator.buf[:4] = b'\x01\x02\x03\x04'
-            self.assertEqual(bytes(allocator.buf[:4]), b'\x01\x02\x03\x04')
+            a = AllocatorProtocol(128)
+            self.assertFalse(a.with_lock)
+            self.assertFalse(a.with_shm)
+            self.assertTrue(a.with_freelist)
 
     def test_lockfree_restores_previous_state(self):
         with AP_LOCKFREE:
-            allocator1 = AllocatorProtocol(64)
-            self.assertFalse(allocator1.with_lock)
-        # After exiting AP_LOCKFREE, default state is restored
-        allocator2 = AllocatorProtocol(64)
-        # Default lock state is macro-configurable — just verify it's bool
-        self.assertIsInstance(allocator2.with_lock, bool)
+            a1 = AllocatorProtocol(64)
+            self.assertFalse(a1.with_lock)
+        # After exiting context, default state is restored
+        a2 = AllocatorProtocol(64)
+        self.assertIsInstance(a2.with_lock, bool)
 
-    def test_lockfree_inverted_with_locked(self):
-        """~AP_LOCKFREE should be equivalent to AP_LOCKED."""
+    def test_lockfree_inverted_is_locked(self):
+        """~AP_LOCKFREE is equivalent to AP_LOCKED."""
         with ~AP_LOCKFREE:
-            allocator = AllocatorProtocol(128)
-            self.assertTrue(allocator.with_lock)
+            a = AllocatorProtocol(128)
+            self.assertTrue(a.with_lock)
 
     def test_locked_inverted_is_lockfree(self):
-        """~AP_LOCKED should be equivalent to AP_LOCKFREE."""
+        """~AP_LOCKED is equivalent to AP_LOCKFREE."""
         with ~AP_LOCKED:
-            allocator = AllocatorProtocol(128)
-            self.assertFalse(allocator.with_lock)
+            a = AllocatorProtocol(128)
+            self.assertFalse(a.with_lock)
 
 
 if __name__ == '__main__':

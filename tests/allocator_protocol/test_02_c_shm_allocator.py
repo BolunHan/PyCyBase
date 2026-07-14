@@ -224,6 +224,18 @@ class TestShmRequest(_FreshAllocatorMixin, unittest.TestCase):
         b = self.allocator.request(32, scan_all_pages=False)
         self.assertEqual(b.size, 32)
 
+    def test_request_scan_all_pages_true_reuses_across_pages(self):
+        """A freed block on an older page is found with scan_all_pages=True."""
+        p1 = self.allocator.extend(8192)
+        b1 = self.allocator.calloc(64)
+        addr1 = b1.address
+        # Force a second page so b1 is no longer on the active page
+        p2 = self.allocator.extend(8192)
+        self.allocator.free(b1)
+        b2 = self.allocator.request(64, scan_all_pages=True)
+        self.assertEqual(b2.address, addr1,
+                         "scan_all_pages=True must find freed block on older page")
+
     def test_request_with_lock_false(self):
         b = self.allocator.request(64, with_lock=False)
         self.assertEqual(b.size, 64)
@@ -249,10 +261,11 @@ class TestShmFree(_FreshAllocatorMixin, unittest.TestCase):
         addrs = {f.address for f in self.allocator.free_list()}
         self.assertIn(addr, addrs)
 
-    def test_double_free_harmless(self):
+    def test_double_free_is_noop_second_time(self):
+        """Freeing an already-freed block: second free is a no-op."""
         b = self.allocator.calloc(256)
         self.allocator.free(b)
-        self.allocator.free(b)
+        self.allocator.free(b)  # must not crash
 
     def test_free_with_lock_false(self):
         b = self.allocator.calloc(64)
@@ -378,6 +391,38 @@ class TestShmIteration(_FreshAllocatorMixin, unittest.TestCase):
 
     def test_free_list_empty_initially(self):
         self.assertEqual(list(self.allocator.free_list()), [])
+
+    def test_allocated_still_includes_freed_until_reclaimed(self):
+        """SHM free moves the block to the free_list but does NOT unlink it
+        from the page's allocated chain.  Only reclaim removes it from
+        the allocated list."""
+        b = self.allocator.calloc(256)
+        addr = b.address
+        self.allocator.free(b)
+        # Freed block is still in allocated() (size=0, on free_list)
+        allocated_addrs = {a.address for a in self.allocator.allocated()}
+        self.assertIn(addr, allocated_addrs,
+                      "SHM free keeps block in allocated list")
+        # After reclaim, it is removed
+        self.allocator.reclaim()
+        allocated_addrs = {a.address for a in self.allocator.allocated()}
+        self.assertNotIn(addr, allocated_addrs,
+                         "block must be gone from allocated() after reclaim")
+
+    def test_free_list_after_reclaim(self):
+        b = self.allocator.calloc(64)
+        self.allocator.free(b)
+        self.assertGreater(len(list(self.allocator.free_list())), 0)
+        self.allocator.reclaim()
+        self.assertEqual(list(self.allocator.free_list()), [],
+                         "free_list must be empty after reclaim")
+
+    def test_calloc_triggers_implicit_extend(self):
+        """First calloc on a fresh allocator implicitly extends a page."""
+        self.assertEqual(self.allocator.mapped_pages, 0)
+        b = self.allocator.calloc(64)
+        self.assertGreaterEqual(self.allocator.mapped_pages, 1)
+        self.assertIsNotNone(self.allocator.active_page)
 
     def test_page_has_name(self):
         page = self.allocator.extend(4096)

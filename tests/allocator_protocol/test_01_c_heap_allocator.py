@@ -241,6 +241,19 @@ class TestRequest(_FreshAllocatorMixin, unittest.TestCase):
         b = self.allocator.request(32, scan_all_pages=False)
         self.assertEqual(b.size, 32)
 
+    def test_scan_all_pages_true_reuses_across_pages(self):
+        """A freed block on an older page is found when scan_all_pages=True."""
+        p1 = self.allocator.extend(8192)
+        b1 = self.allocator.calloc(64)
+        addr1 = b1.address
+        # Force a second page so b1 is no longer on the active page
+        p2 = self.allocator.extend(8192)
+        self.allocator.free(b1)
+        # request with scan_all_pages=True should find b1 on the older page
+        b2 = self.allocator.request(64, scan_all_pages=True)
+        self.assertEqual(b2.address, addr1,
+                         "scan_all_pages=True must find freed block on older page")
+
     def test_zero_size_raises(self):
         with self.assertRaises(OSError):
             self.allocator.request(0)
@@ -270,10 +283,12 @@ class TestFree(_FreshAllocatorMixin, unittest.TestCase):
         addrs = {f.address for f in self.allocator.free_list()}
         self.assertIn(addr, addrs)
 
-    def test_double_free_harmless(self):
+    def test_double_free_is_noop_second_time(self):
+        """Freeing an already-freed block: second free is a no-op
+        (the block's owner flag is already False, so no C call is made)."""
         b = self.allocator.calloc(256)
         self.allocator.free(b)
-        self.allocator.free(b)
+        self.allocator.free(b)  # must not crash or corrupt
 
     def test_free_uninitialized_block_no_crash(self):
         empty = HeapMemoryBlock(0, False)
@@ -388,6 +403,15 @@ class TestExtend(_FreshAllocatorMixin, unittest.TestCase):
         self.assertEqual(self.allocator.mapped_pages, 0)
         self.assertIsNone(self.allocator.active_page)
 
+    def test_calloc_triggers_first_page(self):
+        """First calloc implicitly extends a page when none exists."""
+        self.assertEqual(self.allocator.mapped_pages, 0)
+        b = self.allocator.calloc(64)
+        self.assertGreaterEqual(self.allocator.mapped_pages, 1)
+        self.assertIsNotNone(self.allocator.active_page)
+        self.assertEqual(b.parent_page.address,
+                         self.allocator.active_page.address)
+
 
 # ---------------------------------------------------------------------------
 # Iteration
@@ -434,14 +458,17 @@ class TestIteration(_FreshAllocatorMixin, unittest.TestCase):
         self.assertIsNone(self.allocator.active_page)
 
     def test_allocated_block_chain(self):
-        """next_allocated links blocks on the same page."""
+        """next_allocated links blocks on the same page in LIFO order.
+        Each new calloc block is inserted at the head of the page's
+        allocated list, so b2 (newer) points to b1 (older)."""
         page = self.allocator.extend(16384)
         b1 = self.allocator.calloc(32)
         b2 = self.allocator.calloc(32)
         self.assertEqual(b1.parent_page.address, page.address)
         self.assertEqual(b2.parent_page.address, page.address)
-        if b2.next_allocated is not None:
-            self.assertEqual(b2.next_allocated.address, b1.address)
+        self.assertIsNotNone(b2.next_allocated,
+                             "b2 must link to b1 via next_allocated")
+        self.assertEqual(b2.next_allocated.address, b1.address)
 
 
 # ---------------------------------------------------------------------------
