@@ -31,7 +31,9 @@ Issues = "https://github.com/BolunHan/PyCyBase/issues"
 [tool.setuptools.package-data]
 "cbase" = ["*.h", "*.c", "*.pyx", "*.pxd", "*.pyi"]
 "cbase.allocator_protocol" = ["*.h", "*.c", "*.pyx", "*.pxd", "*.pyi"]
+"cbase.nt" = ["*.h", "*.c", "*.pxd"]
 "cbase.bytemap" = ["*.h", "*.c", "*.pyx", "*.pxd", "*.pyi"]
+"cbase.intern_string" = ["*.h", "*.c", "*.pyx", "*.pxd", "*.pyi"]
 "cbase.includes" = ["*.h", "*.c", "*.cpp"]
 
 [tool.setuptools.packages.find]
