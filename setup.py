@@ -127,9 +127,6 @@ class BuildExtWithConfig(build_ext):
                 with suppress(FileNotFoundError):
                     init_pxd.unlink()
 
-        # Temporarily move the cbase symlink/dir from Cython/Includes
-        # to prevent cythonize from picking up stale pxd files from an
-        # installed version.
         cls._pxd_backup = []
         try:
             import Cython.Includes as _cy_includes
@@ -151,18 +148,6 @@ class BuildExtWithConfig(build_ext):
                 print(f"[build_py] [pre_compile] Restoring Cython/Includes symlink {backup.name} -> {original.name}")
                 backup.rename(original)
         cls._pxd_backup = []
-
-    @classmethod
-    def ensure_init_pxd(cls) -> None:
-        """Ensure __init__.pxd exists from __infra__.pxd before cythonize runs."""
-        project_root = Path(__file__).resolve().parent
-        for module in cls.__cy_modules__:
-            src_dir = project_root.joinpath(*module.split("."))
-            infra_pxd = src_dir / "__infra__.pxd"
-            init_pxd = src_dir / "__init__.pxd"
-            if infra_pxd.exists() and not init_pxd.exists():
-                print(f"[build_py] [pre_compile] Creating {init_pxd} from {infra_pxd}")
-                shutil.copyfile(infra_pxd, init_pxd)
 
     def inject_pxd(self) -> None:
         project_root = Path(__file__).resolve().parent
@@ -194,40 +179,44 @@ class BuildExtWithConfig(build_ext):
 
 _IS_WINDOWS = platform.system() == "Windows"
 
-cython_extension.extend(
-    [
-        Extension(
-            name="cbase.env",
-            sources=["cbase/env.pyx"],
-            extra_compile_args=COMPILE_FLAGS,
-            include_dirs=[REPO_ROOT]
-        ),
-        Extension(
-            name="cbase.allocator_protocol.c_heap_allocator",
-            sources=["cbase/allocator_protocol/c_heap_allocator.pyx"],
-            extra_compile_args=COMPILE_FLAGS,
-            include_dirs=[REPO_ROOT]
-        ),
-        Extension(
-            name="cbase.allocator_protocol.c_allocator_protocol",
-            sources=["cbase/allocator_protocol/c_allocator_protocol.pyx"],
-            extra_compile_args=COMPILE_FLAGS,
-            include_dirs=[REPO_ROOT]
-        ),
-        Extension(
-            name="cbase.bytemap.c_bytemap",
-            sources=["cbase/bytemap/c_bytemap.pyx"],
-            extra_compile_args=COMPILE_FLAGS,
-            include_dirs=[REPO_ROOT]
-        ),
-        Extension(
-            name="cbase.intern_string.c_intern_string",
-            sources=["cbase/intern_string/c_intern_string.pyx"],
-            extra_compile_args=COMPILE_FLAGS,
-            include_dirs=[REPO_ROOT]
-        ),
-    ]
-)
+cython_extension.extend([
+    Extension(
+        name="cbase.env",
+        sources=["cbase/env.pyx"],
+        extra_compile_args=COMPILE_FLAGS,
+        include_dirs=[REPO_ROOT]
+    ),
+    Extension(
+        name="cbase.allocator_protocol.c_shm_comp",
+        sources=["cbase/allocator_protocol/c_shm_comp.pyx"],
+        extra_compile_args=COMPILE_FLAGS,
+        include_dirs=[REPO_ROOT]
+    ),
+    Extension(
+        name="cbase.allocator_protocol.c_heap_allocator",
+        sources=["cbase/allocator_protocol/c_heap_allocator.pyx"],
+        extra_compile_args=COMPILE_FLAGS,
+        include_dirs=[REPO_ROOT]
+    ),
+    Extension(
+        name="cbase.allocator_protocol.c_allocator_protocol",
+        sources=["cbase/allocator_protocol/c_allocator_protocol.pyx"],
+        extra_compile_args=COMPILE_FLAGS,
+        include_dirs=[REPO_ROOT]
+    ),
+    Extension(
+        name="cbase.bytemap.c_bytemap",
+        sources=["cbase/bytemap/c_bytemap.pyx"],
+        extra_compile_args=COMPILE_FLAGS,
+        include_dirs=[REPO_ROOT]
+    ),
+    Extension(
+        name="cbase.intern_string.c_intern_string",
+        sources=["cbase/intern_string/c_intern_string.pyx"],
+        extra_compile_args=COMPILE_FLAGS,
+        include_dirs=[REPO_ROOT]
+    ),
+])
 
 if _IS_WINDOWS:
     cython_extension.append(
@@ -249,7 +238,6 @@ else:
     )
 
 BuildExtWithConfig.remove_pxd()
-BuildExtWithConfig.ensure_init_pxd()
 
 try:
     ext_modules.extend(
@@ -279,7 +267,7 @@ ext_modules.extend(c_extensions)
 
 
 setup(
-    name="PyCyBase",
+    name=PACKAGE_NAME,
     ext_modules=ext_modules,
     cmdclass={"build_ext": BuildExtWithConfig},
 )
