@@ -4,11 +4,7 @@ from libcpp cimport bool as c_bool
 from cbase.env cimport EnvConfigContext
 
 from .c_heap_allocator cimport heap_allocator as heap_allocator_t
-
-IF UNAME_SYSNAME == "Windows":
-    from .c_nt_shm_allocator cimport nt_shm_allocator as shm_allocator_t, nt_shm_allocator_ctx as shm_allocator_ctx_t
-ELSE:
-    from .c_shm_allocator cimport shm_allocator as shm_allocator_t, shm_allocator_ctx as shm_allocator_ctx_t
+from .c_shm_comp cimport shm_allocator as shm_allocator_t, shm_allocator_ctx as shm_allocator_ctx_t
 
 
 cdef extern from "cbase/allocator_protocol/c_allocator_protocol.h":
