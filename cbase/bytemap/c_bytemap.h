@@ -1,5 +1,5 @@
-#ifndef C_BYTEMAP_H
-#define C_BYTEMAP_H
+#ifndef C_CBASE_BYTEMAP_H
+#define C_CBASE_BYTEMAP_H
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -7,7 +7,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifdef _WIN32
+#include <process.h>
+#define getpid _getpid
+#else
 #include <unistd.h>
+#endif
 
 #include <cbase/allocator_protocol/c_allocator_protocol.h>
 #include <cbase/bytemap/xxh3.h>
@@ -800,4 +805,4 @@ static inline void* c_bytemap_entry_value(const bytemap_entry* entry) {
     return *(void**) entry->value;
 }
 
-#endif  // C_BYTEMAP_H
+#endif  // C_CBASE_BYTEMAP_H
