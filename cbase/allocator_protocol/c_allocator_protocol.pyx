@@ -2,12 +2,7 @@ from libc.stdint cimport uintptr_t
 from libc.stdlib cimport calloc
 
 from .c_heap_allocator cimport C_ALLOCATOR as HEAP_ALLOCATOR
-
-IF UNAME_SYSNAME == "Windows":
-    from .c_nt_shm_allocator cimport nt_shm_allocator_ctx
-    cdef nt_shm_allocator_ctx* SHM_ALLOCATOR = NULL
-ELSE:
-    from .c_shm_allocator cimport C_ALLOCATOR as SHM_ALLOCATOR
+from .c_shm_comp cimport C_SHM_COMP as SHM_ALLOCATOR
 
 
 cdef class AllocatorConfigContext(EnvConfigContext):
