@@ -18,10 +18,10 @@ PACKAGE_NAME = "cbase"
 DISPLAY_NAME = "PyCyBase"
 
 WITH_ANNOTATION = False
-COMPILE_FLAGS = ["/Ox"] if platform.system() == "Windows" else ['-O3', '-march=native']
+COMPILE_FLAGS = ["/Ox", "/std:c17", "/experimental:c11atomics"] if platform.system() == "Windows" else ['-O3', '-march=native']
 REPO_ROOT = os.path.abspath(os.path.dirname(__file__))
 N_CORES = os.cpu_count() or 1
-N_THREADS = max(1, N_CORES - 2)
+N_THREADS = 0 if platform.system() == "Windows" else max(1, N_CORES - 2)
 __VERSION__ = match.group(1) if (match := re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']', (Path(REPO_ROOT) / PACKAGE_NAME / '__init__.py').read_text(), re.MULTILINE)) else "unknown"
 
 ext_modules = []
@@ -39,6 +39,7 @@ class BuildExtWithConfig(build_ext):
         "cbase",
         "cbase.allocator_protocol",
         "cbase.bytemap",
+        "cbase.intern_string",
     ]
 
     def initialize_options(self):
@@ -151,6 +152,18 @@ class BuildExtWithConfig(build_ext):
                 backup.rename(original)
         cls._pxd_backup = []
 
+    @classmethod
+    def ensure_init_pxd(cls) -> None:
+        """Ensure __init__.pxd exists from __infra__.pxd before cythonize runs."""
+        project_root = Path(__file__).resolve().parent
+        for module in cls.__cy_modules__:
+            src_dir = project_root.joinpath(*module.split("."))
+            infra_pxd = src_dir / "__infra__.pxd"
+            init_pxd = src_dir / "__init__.pxd"
+            if infra_pxd.exists() and not init_pxd.exists():
+                print(f"[build_py] [pre_compile] Creating {init_pxd} from {infra_pxd}")
+                shutil.copyfile(infra_pxd, init_pxd)
+
     def inject_pxd(self) -> None:
         project_root = Path(__file__).resolve().parent
 
@@ -179,6 +192,8 @@ class BuildExtWithConfig(build_ext):
 # Define Cython Extensions
 # =============================
 
+_IS_WINDOWS = platform.system() == "Windows"
+
 cython_extension.extend(
     [
         Extension(
@@ -194,12 +209,6 @@ cython_extension.extend(
             include_dirs=[REPO_ROOT]
         ),
         Extension(
-            name="cbase.allocator_protocol.c_shm_allocator",
-            sources=["cbase/allocator_protocol/c_shm_allocator.pyx"],
-            extra_compile_args=COMPILE_FLAGS,
-            include_dirs=[REPO_ROOT]
-        ),
-        Extension(
             name="cbase.allocator_protocol.c_allocator_protocol",
             sources=["cbase/allocator_protocol/c_allocator_protocol.pyx"],
             extra_compile_args=COMPILE_FLAGS,
@@ -211,10 +220,36 @@ cython_extension.extend(
             extra_compile_args=COMPILE_FLAGS,
             include_dirs=[REPO_ROOT]
         ),
+        Extension(
+            name="cbase.intern_string.c_intern_string",
+            sources=["cbase/intern_string/c_intern_string.pyx"],
+            extra_compile_args=COMPILE_FLAGS,
+            include_dirs=[REPO_ROOT]
+        ),
     ]
 )
 
+if _IS_WINDOWS:
+    cython_extension.append(
+        Extension(
+            name="cbase.allocator_protocol.c_nt_shm_allocator",
+            sources=["cbase/allocator_protocol/c_nt_shm_allocator.pyx"],
+            extra_compile_args=COMPILE_FLAGS,
+            include_dirs=[REPO_ROOT]
+        )
+    )
+else:
+    cython_extension.append(
+        Extension(
+            name="cbase.allocator_protocol.c_shm_allocator",
+            sources=["cbase/allocator_protocol/c_shm_allocator.pyx"],
+            extra_compile_args=COMPILE_FLAGS,
+            include_dirs=[REPO_ROOT]
+        )
+    )
+
 BuildExtWithConfig.remove_pxd()
+BuildExtWithConfig.ensure_init_pxd()
 
 try:
     ext_modules.extend(
