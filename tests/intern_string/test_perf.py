@@ -58,27 +58,20 @@ def main():
     print(f'  total key bytes = {results["total_key_bytes"]:,}')
     print()
 
-    print('--- Per-operation latency (avg) ---')
+    print('--- C-level InternString (avg per op) ---')
     print(f'  {"istr_hash (fnv1a)":<28s} {fmt_ns(results["istr_hash_ns"])}')
-    print(f'  {"istr_intern":<28s} {fmt_ns(results["istr_intern_ns"])}')
-    print(f'  {"istr_lookup":<28s} {fmt_ns(results["istr_lookup_ns"])}')
-    print(f'  {"istr_eq":<28s} {fmt_ns(results["istr_eq_ns"])}')
-    print(f'  {"py_unicode (create)":<28s} {fmt_ns(results["py_unicode_ns"])}')
-    print(f'  {"py_hash (str)":<28s} {fmt_ns(results["py_hash_ns"])}')
-    print(f'  {"py_eq (str)":<28s} {fmt_ns(results["py_eq_ns"])}')
+    print(f'  {"istr_intern (unlocked)":<28s} {fmt_ns(results["istr_intern_ns"])}')
+    print(f'  {"istr_intern (synced)":<28s} {fmt_ns(results["istr_intern_synced_ns"])}')
+    print(f'  {"  mutex overhead":<28s} {fmt_ns(results["intern_mutex_ns"])}')
+    print(f'  {"istr_lookup (unlocked)":<28s} {fmt_ns(results["istr_lookup_ns"])}')
+    print(f'  {"istr_lookup (synced)":<28s} {fmt_ns(results["istr_lookup_synced_ns"])}')
+    print(f'  {"  mutex overhead":<28s} {fmt_ns(results["lookup_mutex_ns"])}')
+    print(f'  {"istr_eq (Python ==)":<28s} {fmt_ns(results["istr_eq_ns"])}')
     print()
-
-    # Speedup ratios
-    if results['py_hash_ns'] > 0:
-        ratio = results['py_hash_ns'] / max(results['istr_hash_ns'], 1e-9)
-        print(f'  hash speedup:      istr {ratio:.1f}x faster than py str')
-    if results['py_eq_ns'] > 0:
-        ratio = results['py_eq_ns'] / max(results['istr_eq_ns'], 1e-9)
-        print(f'  eq speedup:        istr {ratio:.1f}x faster than py str')
-    if results['py_unicode_ns'] > 0:
-        ratio = results['py_unicode_ns'] / max(results['istr_intern_ns'], 1e-9)
-        print(f'  intern vs unicode: istr_intern {ratio:.1f}x vs py unicode create')
-
+    print('--- Python str (avg per op) ---')
+    print(f'  {"py_unicode (create)":<28s} {fmt_ns(results["py_unicode_ns"])}')
+    print(f'  {"py_hash":<28s} {fmt_ns(results["py_hash_ns"])}')
+    print(f'  {"py_eq":<28s} {fmt_ns(results["py_eq_ns"])}')
     print()
     print('--- Raw timings (seconds) ---')
     for k in sorted(results):
