@@ -151,6 +151,8 @@ static inline bytemap_entry* c_bytemap_entry_next(const bytemap* map, bytemap_en
 static inline bytemap_entry* c_bytemap_entry_first(const bytemap* map);
 static inline void           c_bytemap_invoke_callbacks(bytemap_callback_event event, const bytemap* map, const char* key, size_t key_len, const char* value, size_t value_len, uint64_t seq_id);
 
+static inline int            c_bytemap_ex_init(bytemap* map, size_t capacity, size_t slot_capacity, allocator_protocol* allocator);
+static inline void           c_bytemap_ex_dealloc(bytemap* map);
 static inline bytemap*       c_bytemap_ex_new(size_t capacity, size_t slot_capacity, allocator_protocol* allocator);
 static inline void           c_bytemap_ex_clear(bytemap* map);
 static inline void           c_bytemap_ex_free(bytemap* map);
@@ -282,21 +284,20 @@ static inline void c_bytemap_invoke_callbacks(bytemap_callback_event event, cons
 
 // ========== Core bytemap_ex APIs (primary implementations) ==========
 
-static inline bytemap* c_bytemap_ex_new(size_t capacity, size_t slot_capacity, allocator_protocol* allocator) {
+static inline int c_bytemap_ex_init(bytemap* map, size_t capacity, size_t slot_capacity, allocator_protocol* allocator) {
+    if (!map) return BYTEMAP_ERR_INVALID_BUF;
+    if (!c_ap_is_allocator_buf(map)) return BYTEMAP_ERR_INVALID_BUF;
+
     if (capacity == 0) capacity = DEFAULT_BYTEMAP_CAPACITY;
     if (capacity < MIN_BYTEMAP_CAPACITY) capacity = MIN_BYTEMAP_CAPACITY;
-    if (capacity > MAX_BYTEMAP_CAPACITY) return NULL;
-    if (slot_capacity == 0) return NULL;
+    if (capacity > MAX_BYTEMAP_CAPACITY) return BYTEMAP_ERR_INVALID_BUF;
+    if (slot_capacity == 0) return BYTEMAP_ERR_INVALID_BUF;
 
-    size_t   entry_size = sizeof(bytemap_entry) + slot_capacity;
-    bytemap* map = (bytemap*) c_ap_alloc(sizeof(bytemap), allocator);
-    if (!map) return NULL;
+    size_t         entry_size = sizeof(bytemap_entry) + slot_capacity;
     bytemap_entry* table = (bytemap_entry*) c_ap_alloc(capacity * entry_size, allocator);
-    if (!table) {
-        c_ap_free((void*) map);
-        return NULL;
-    }
+    if (!table) return BYTEMAP_ERR_OOM;
 
+    memset(map, 0, sizeof(bytemap));
     map->table = table;
     map->table_end = (void*) ((char*) table + (capacity * entry_size));
     map->capacity = capacity;
@@ -304,6 +305,43 @@ static inline bytemap* c_bytemap_ex_new(size_t capacity, size_t slot_capacity, a
     map->entry_size = entry_size;
     uint64_t seed = (uint64_t) (uintptr_t) map ^ (uint64_t) capacity;
     map->salt = XXH3_64bits(&seed, sizeof(seed)) ^ BYTEMAP_SALT_MAGIC;
+    return BYTEMAP_OK;
+}
+
+static inline void c_bytemap_ex_dealloc(bytemap* map) {
+    if (!map) return;
+
+    c_bytemap_ex_clear(map);
+    c_bytemap_invoke_callbacks(BYTEMAP_CALLBACK_EVENT_FREED, map, NULL, 0, NULL, 0, (uint64_t) -1);
+
+    // Free callback list
+    bytemap_callback_ctx* cb = map->callbacks;
+    while (cb) {
+        bytemap_callback_ctx* next = cb->next;
+        free(cb);
+        cb = next;
+    }
+
+    if (map->table) c_ap_free(map->table);
+
+    // Zero out the struct but do NOT free the struct itself
+    memset(map, 0, sizeof(bytemap));
+}
+
+static inline bytemap* c_bytemap_ex_new(size_t capacity, size_t slot_capacity, allocator_protocol* allocator) {
+    if (capacity == 0) capacity = DEFAULT_BYTEMAP_CAPACITY;
+    if (capacity < MIN_BYTEMAP_CAPACITY) capacity = MIN_BYTEMAP_CAPACITY;
+    if (capacity > MAX_BYTEMAP_CAPACITY) return NULL;
+    if (slot_capacity == 0) return NULL;
+
+    bytemap* map = (bytemap*) c_ap_alloc(sizeof(bytemap), allocator);
+    if (!map) return NULL;
+
+    int ret = c_bytemap_ex_init(map, capacity, slot_capacity, allocator);
+    if (ret != BYTEMAP_OK) {
+        c_ap_free(map);
+        return NULL;
+    }
     return map;
 }
 
@@ -327,19 +365,7 @@ static inline void c_bytemap_ex_clear(bytemap* map) {
 
 static inline void c_bytemap_ex_free(bytemap* map) {
     if (!map) return;
-
-    c_bytemap_ex_clear(map);
-    c_bytemap_invoke_callbacks(BYTEMAP_CALLBACK_EVENT_FREED, map, NULL, 0, NULL, 0, (uint64_t) -1);
-
-    bytemap_callback_ctx* cb = map->callbacks;
-    while (cb) {
-        bytemap_callback_ctx* next = cb->next;
-        free(cb);
-        cb = next;
-    }
-
-    if (map->table) c_ap_free(map->table);
-
+    c_bytemap_ex_dealloc(map);
     c_ap_free(map);
 }
 

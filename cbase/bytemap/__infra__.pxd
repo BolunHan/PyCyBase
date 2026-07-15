@@ -13,6 +13,7 @@ from .c_bytemap cimport (
     c_bytemap_entry_at, c_bytemap_entry_next, c_bytemap_entry_first,
     c_bytemap_invoke_callbacks,
 
+    c_bytemap_ex_init, c_bytemap_ex_dealloc,
     c_bytemap_ex_new, c_bytemap_ex_clear, c_bytemap_ex_free,
     c_bytemap_ex_register_callback, c_bytemap_ex_unregister_callback,
     c_bytemap_ex_get, c_bytemap_ex_get_ptr, c_bytemap_ex_contains,
