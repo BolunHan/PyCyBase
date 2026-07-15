@@ -38,6 +38,7 @@ cdef extern from "cbase/allocator_protocol/c_allocator_protocol.h":
     void c_ap_decref(void* ptr) noexcept nogil
     char* c_ap_strdup(const char* src, allocator_protocol* allocator) noexcept nogil
     void* c_ap_realloc(void* src, size_t new_size, allocator_protocol* allocator) noexcept nogil
+    c_bool c_ap_is_allocator_buf(const void* ptr) noexcept nogil
 
 
 cdef class AllocatorConfigContext(EnvConfigContext):

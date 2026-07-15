@@ -89,6 +89,7 @@ static inline void                c_ap_incref(void* ptr);
 static inline void                c_ap_decref(void* ptr);
 static inline char*               c_ap_strdup(const char* src, allocator_protocol* allocator);
 static inline void*               c_ap_realloc(void* src, size_t new_size, allocator_protocol* allocator);
+static inline bool                c_ap_is_allocator_buf(const void* ptr);
 
 // ========== Utilities Functions ==========
 
@@ -335,6 +336,17 @@ static inline void* c_ap_realloc(void* src, size_t new_size, allocator_protocol*
     memcpy(new_ptr, src, copy_size);
     c_ap_free(src);
     return new_ptr;
+}
+
+static inline bool c_ap_is_allocator_buf(const void* ptr) {
+    if (!ptr) return false;
+#if AP_ALLOC_VIGILANT > 0
+    allocator_protocol* protocol = (allocator_protocol*) ((char*) ptr - offsetof(allocator_protocol, buf));
+    return protocol->magic == AP_ALLOC_MAGIC;
+#else
+    (void) ptr;
+    return true;
+#endif
 }
 
 #endif /* C_ALLOCATOR_PROTOCOL_H */

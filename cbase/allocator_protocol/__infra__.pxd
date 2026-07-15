@@ -14,6 +14,7 @@ from .c_allocator_protocol cimport (
     c_ap_decref,
     c_ap_strdup,
     c_ap_realloc,
+    c_ap_is_allocator_buf,
 
     AP_ALLOC_WITH_LOCK, AP_ALLOC_WITH_SHM, AP_ALLOC_WITH_FREELIST,
     EnvConfigContext, AllocatorConfigContext,
