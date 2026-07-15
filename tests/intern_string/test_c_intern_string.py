@@ -9,6 +9,7 @@ import sys
 import time
 import unittest
 import threading
+import multiprocessing
 
 from cbase.intern_string import c_intern_string as cis
 from cbase.intern_string.c_intern_string import (
@@ -17,6 +18,23 @@ from cbase.intern_string.c_intern_string import (
     POOL,
     INTRA_POOL,
 )
+
+
+def _mp_worker(queue):
+    """Module-level worker for test_multiprocessing_module.
+
+    Defined at module level so it is picklable by forkless start methods
+    (forkserver on Linux 3.14+, spawn on Windows).
+    """
+    try:
+        istr_cat = POOL['mp_cat']
+        if istr_cat.string != 'mp_cat':
+            queue.put(('fail', f'Wrong string: {istr_cat.string}'))
+            return
+        POOL.istr('mp_dog')
+        queue.put(('ok', None))
+    except Exception as e:
+        queue.put(('error', str(e)))
 
 _FORK_AVAILABLE = hasattr(os, 'fork') and sys.platform != 'win32'
 
@@ -734,21 +752,27 @@ class TestMultiprocess(unittest.TestCase):
             self.assertEqual(inst.string, 'fork_test_child')
 
     def test_multiprocessing_module(self):
-        from multiprocessing import Process
+        # This test verifies shared-memory inheritance across a fork.
+        # Python 3.14 changed the default start method from 'fork' to
+        # 'forkserver' on Linux.  We explicitly request 'fork' since
+        # that is the behaviour under test; on platforms where fork is
+        # unavailable (Windows) we skip gracefully.
+        if 'fork' not in multiprocessing.get_all_start_methods():
+            self.skipTest("'fork' start method not available on this platform")
+        ctx = multiprocessing.get_context('fork')
 
         POOL.istr('mp_cat')
 
-        def worker():
-            istr_cat = POOL['mp_cat']
-            self.assertEqual(istr_cat.string, 'mp_cat')
-            POOL.istr('mp_dog')
-
-        p = Process(target=worker)
+        queue = ctx.Queue()
+        p = ctx.Process(target=_mp_worker, args=(queue,))
         p.start()
         time.sleep(0.5)
         POOL.istr('mp_dog')  # also intern from parent
         p.join()
+
         self.assertEqual(p.exitcode, 0)
+        status, detail = queue.get()
+        self.assertEqual(status, 'ok', f'Worker failed: {detail}')
         # Both should see 'mp_dog'
         self.assertEqual(POOL['mp_dog'].string, 'mp_dog')
 
