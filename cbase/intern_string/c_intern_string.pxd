@@ -79,6 +79,10 @@ cdef class IstrTestToolkit:
     cdef readonly size_t n_seg
     cdef readonly size_t max_seg_len
     cdef readonly size_t n_iters
+    cdef readonly size_t n_unique
+
+    cdef size_t* shuffle_indices
+    cdef readonly size_t n_ops
 
     cdef readonly InternStringPool pool
     cdef list py_strings
@@ -86,6 +90,8 @@ cdef class IstrTestToolkit:
 
     cdef inline void c_gen_buf(self)
     cdef inline void c_gen_segments(self)
+    cdef inline void c_gen_shuffle(self)
+    cdef inline void c_gen_miss_pattern(self, double miss_rate)
     cdef inline void c_prepare_py_objects(self)
     cdef inline void c_prepare_istr_pool(self)
 
@@ -94,8 +100,13 @@ cdef class IstrTestToolkit:
     cpdef double istr_intern_synced_routine(self)
     cpdef double istr_lookup_routine(self)
     cpdef double istr_lookup_synced_routine(self)
+    cpdef double istr_limited_pool_routine(self)
+    cpdef double istr_limited_pool_synced_routine(self)
+    cpdef double istr_miss_rate_routine(self, double miss_rate)
+    cpdef double py_unicode_miss_rate_routine(self, double miss_rate)
     cpdef double istr_eq_routine(self)
     cpdef double py_unicode_routine(self)
+    cpdef double py_unicode_limited_routine(self)
     cpdef double py_hash_routine(self)
     cpdef double py_eq_routine(self)
     cpdef dict run_test(self)

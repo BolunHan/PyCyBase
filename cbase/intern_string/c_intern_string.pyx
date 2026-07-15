@@ -136,7 +136,8 @@ cdef class IstrTestToolkit:
     """
 
     def __cinit__(self, size_t buf_size=2**30, size_t n_seg=100_000,
-                  size_t max_seg_len=64, size_t n_iters=10):
+                  size_t max_seg_len=64, size_t n_iters=10,
+                  size_t n_unique=0, size_t n_ops=0):
         from random import seed, randint
         cdef size_t i
 
@@ -150,6 +151,10 @@ cdef class IstrTestToolkit:
         self.n_seg = n_seg
         self.max_seg_len = max_seg_len
         self.n_iters = n_iters
+        self.n_unique = n_unique if n_unique > 0 else max(n_seg // 10, 1)
+        self.n_ops = n_ops if n_ops > 0 else n_seg
+        if self.n_unique > n_seg:
+            raise ValueError(f'n_unique={n_unique} must be <= n_seg={n_seg}')
 
         # Allocate the character buffer (1 extra byte for NUL safety)
         self.buf = <char*> calloc(buf_size + 1, 1)
@@ -161,6 +166,11 @@ cdef class IstrTestToolkit:
         self.seg_lengths = <size_t*> calloc(n_seg, sizeof(size_t))
         self.c_keys = <const char**> calloc(n_seg, sizeof(const char*))
         self.c_key_lens = <size_t*> calloc(n_seg, sizeof(size_t))
+        # Shuffle indices for limited-pool benchmarks
+        self.shuffle_indices = <size_t*> calloc(self.n_ops, sizeof(size_t))
+        if self.shuffle_indices == NULL:
+            raise MemoryError(f'Failed to allocate shuffle indices for n_ops={self.n_ops}')
+
         if (self.seg_offsets == NULL or self.seg_lengths == NULL or
             self.c_keys == NULL or self.c_key_lens == NULL):
             raise MemoryError(f'Failed to allocate segment arrays for n_seg={n_seg}')
@@ -169,6 +179,7 @@ cdef class IstrTestToolkit:
         seed(42)  # reproducible
         self.c_gen_buf()
         self.c_gen_segments()
+        self.c_gen_shuffle()
 
         # Prepare Python objects and intern pool
         self.py_strings = []
@@ -193,6 +204,9 @@ cdef class IstrTestToolkit:
         if self.c_key_lens != NULL:
             free(self.c_key_lens)
             self.c_key_lens = NULL
+        if self.shuffle_indices != NULL:
+            free(self.shuffle_indices)
+            self.shuffle_indices = NULL
 
     # ------------------------------------------------------------------
     #  Setup helpers
@@ -457,19 +471,215 @@ cdef class IstrTestToolkit:
         return elapsed
 
     # ------------------------------------------------------------------
+    #  Shuffle generator — random picks from limited unique pool
+    # ------------------------------------------------------------------
+
+    cdef inline void c_gen_shuffle(self):
+        """Fill shuffle_indices with random picks from [0, n_unique)."""
+        from random import randint
+        cdef size_t i
+        for i in range(self.n_ops):
+            self.shuffle_indices[i] = <size_t> randint(0, <int> self.n_unique - 1)
+
+    # ------------------------------------------------------------------
+    #  Limited-pool intern — realistic workload (hits + misses mixed)
+    # ------------------------------------------------------------------
+
+    cpdef double istr_limited_pool_routine(self):
+        """Repeatedly intern from a limited pool of n_unique strings.
+
+        Each iteration picks n_ops random strings (with replacement) from
+        the first n_unique segments and interns them.  Since the pool is
+        small relative to n_ops, most operations are hits (already-interned
+        keys) — this mirrors real-world usage where a finite set of strings
+        (e.g. ticker symbols) is interned repeatedly.
+        """
+        cdef size_t iter_idx, i, idx
+        cdef double elapsed = 0.0
+        cdef double start_ts
+        cdef istr_map* cmap
+        cdef const istr_entry* entry
+        cdef uintptr_t checksum = 0
+
+        from time import perf_counter
+        for iter_idx in range(self.n_iters):
+            cmap = c_istr_map_new(0, AP_DEFAULT_ALLOCATOR)
+            if cmap == NULL:
+                raise MemoryError('c_istr_map_new failed')
+            start_ts = perf_counter()
+            for i in range(self.n_ops):
+                idx = self.shuffle_indices[i]
+                c_istr(cmap, self.c_keys[idx], self.c_key_lens[idx], &entry)
+                checksum += <uintptr_t> entry
+            elapsed += perf_counter() - start_ts
+            c_istr_map_free(cmap)
+
+        self.buf[0] = <char> (checksum & 0xFF)
+        return elapsed
+
+    cpdef double istr_limited_pool_synced_routine(self):
+        """Same as istr_limited_pool_routine but with c_istr_synced."""
+        cdef size_t iter_idx, i, idx
+        cdef double elapsed = 0.0
+        cdef double start_ts
+        cdef istr_map* cmap
+        cdef const istr_entry* entry
+        cdef uintptr_t checksum = 0
+
+        from time import perf_counter
+        for iter_idx in range(self.n_iters):
+            cmap = c_istr_map_new(0, AP_DEFAULT_ALLOCATOR)
+            if cmap == NULL:
+                raise MemoryError('c_istr_map_new failed')
+            start_ts = perf_counter()
+            for i in range(self.n_ops):
+                idx = self.shuffle_indices[i]
+                c_istr_synced(cmap, self.c_keys[idx], self.c_key_lens[idx], &entry)
+                checksum += <uintptr_t> entry
+            elapsed += perf_counter() - start_ts
+            c_istr_map_free(cmap)
+
+        self.buf[0] = <char> (checksum & 0xFF)
+        return elapsed
+
+    # ------------------------------------------------------------------
+    #  Python unicode creation from limited pool
+    # ------------------------------------------------------------------
+
+    cpdef double py_unicode_limited_routine(self):
+        """Create Python str objects from random limited-pool picks."""
+        cdef size_t iter_idx, i, idx
+        cdef double elapsed = 0.0
+        cdef double start_ts
+        cdef bytes b
+        cdef str s
+        cdef uintptr_t checksum = 0
+
+        from time import perf_counter
+        for iter_idx in range(self.n_iters):
+            start_ts = perf_counter()
+            for i in range(self.n_ops):
+                idx = self.shuffle_indices[i]
+                b = self.buf[self.seg_offsets[idx]:self.seg_offsets[idx] + self.seg_lengths[idx]]
+                s = b.decode('ascii')
+                checksum += len(s)
+            elapsed += perf_counter() - start_ts
+
+        self.buf[0] = <char> (checksum & 0xFF)
+        return elapsed
+
+    # ------------------------------------------------------------------
+    #  Miss-rate controlled benchmarks
+    # ------------------------------------------------------------------
+
+    cdef inline void c_gen_miss_pattern(self, double miss_rate):
+        """Fill shuffle_indices with a pattern achieving the target miss rate.
+
+        Misses (new unique strings) are evenly distributed at interval
+        ceil(1/miss_rate).  Between misses, random picks from the
+        already-seen set simulate hits.
+        """
+        from random import randint
+        cdef size_t i, seq_ptr, miss_interval
+        cdef size_t n_misses
+
+        if miss_rate <= 0.0 or miss_rate > 1.0:
+            raise ValueError(f'miss_rate must be in (0, 1], got {miss_rate}')
+
+        n_misses = <size_t> (self.n_ops * miss_rate)
+        if n_misses < 1:
+            n_misses = 1
+        if n_misses > self.n_seg:
+            raise ValueError(f'n_misses={n_misses} exceeds n_seg={self.n_seg}')
+
+        miss_interval = self.n_ops // n_misses
+        if miss_interval < 1:
+            miss_interval = 1
+
+        seq_ptr = 0
+        for i in range(self.n_ops):
+            if i % miss_interval == 0 and seq_ptr < n_misses:
+                # MISS — use next unique segment
+                self.shuffle_indices[i] = seq_ptr
+                seq_ptr += 1
+            else:
+                # HIT — random pick from already-seen set
+                if seq_ptr > 0:
+                    self.shuffle_indices[i] = <size_t> randint(0, <int> seq_ptr - 1)
+                else:
+                    self.shuffle_indices[i] = 0
+
+    cpdef double istr_miss_rate_routine(self, double miss_rate):
+        """Benchmark intern with a controlled miss rate.
+
+        miss_rate=0.001 → 1/1K, miss_rate=0.0001 → 1/10K, etc.
+        """
+        cdef size_t iter_idx, i, idx
+        cdef double elapsed = 0.0
+        cdef double start_ts
+        cdef istr_map* cmap
+        cdef const istr_entry* entry
+        cdef uintptr_t checksum = 0
+
+        self.c_gen_miss_pattern(miss_rate)
+
+        from time import perf_counter
+        for iter_idx in range(self.n_iters):
+            cmap = c_istr_map_new(0, AP_DEFAULT_ALLOCATOR)
+            if cmap == NULL:
+                raise MemoryError('c_istr_map_new failed')
+            start_ts = perf_counter()
+            for i in range(self.n_ops):
+                idx = self.shuffle_indices[i]
+                c_istr(cmap, self.c_keys[idx], self.c_key_lens[idx], &entry)
+                checksum += <uintptr_t> entry
+            elapsed += perf_counter() - start_ts
+            c_istr_map_free(cmap)
+
+        self.buf[0] = <char> (checksum & 0xFF)
+        return elapsed
+
+    cpdef double py_unicode_miss_rate_routine(self, double miss_rate):
+        """Python str creation with the same miss-rate pattern."""
+        cdef size_t iter_idx, i, idx
+        cdef double elapsed = 0.0
+        cdef double start_ts
+        cdef bytes b
+        cdef str s
+        cdef uintptr_t checksum = 0
+
+        self.c_gen_miss_pattern(miss_rate)
+
+        from time import perf_counter
+        for iter_idx in range(self.n_iters):
+            start_ts = perf_counter()
+            for i in range(self.n_ops):
+                idx = self.shuffle_indices[i]
+                b = self.buf[self.seg_offsets[idx]:self.seg_offsets[idx] + self.seg_lengths[idx]]
+                s = b.decode('ascii')
+                checksum += len(s)
+            elapsed += perf_counter() - start_ts
+
+        self.buf[0] = <char> (checksum & 0xFF)
+        return elapsed
+
+    # ------------------------------------------------------------------
     #  Run all benchmarks
     # ------------------------------------------------------------------
 
     cpdef dict run_test(self):
-        cdef double istr_hash_t      = self.istr_hash_routine()
-        cdef double istr_intern_t    = self.istr_intern_routine()
-        cdef double istr_intern_s_t  = self.istr_intern_synced_routine()
-        cdef double istr_lookup_t    = self.istr_lookup_routine()
-        cdef double istr_lookup_s_t  = self.istr_lookup_synced_routine()
-        cdef double istr_eq_t        = self.istr_eq_routine()
-        cdef double py_unicode_t     = self.py_unicode_routine()
-        cdef double py_hash_t        = self.py_hash_routine()
-        cdef double py_eq_t          = self.py_eq_routine()
+        cdef double istr_hash_t        = self.istr_hash_routine()
+        cdef double istr_intern_t      = self.istr_intern_routine()
+        cdef double istr_intern_s_t    = self.istr_intern_synced_routine()
+        cdef double istr_lookup_t      = self.istr_lookup_routine()
+        cdef double istr_lookup_s_t    = self.istr_lookup_synced_routine()
+        cdef double istr_limited_t     = self.istr_limited_pool_routine()
+        cdef double istr_limited_s_t   = self.istr_limited_pool_synced_routine()
+        cdef double istr_eq_t          = self.istr_eq_routine()
+        cdef double py_unicode_t       = self.py_unicode_routine()
+        cdef double py_unicode_lim_t   = self.py_unicode_limited_routine()
+        cdef double py_hash_t          = self.py_hash_routine()
+        cdef double py_eq_t            = self.py_eq_routine()
 
         cdef size_t total_bytes = 0
         cdef size_t i
@@ -478,37 +688,50 @@ cdef class IstrTestToolkit:
 
         cdef size_t n = self.n_seg
         cdef size_t n_iters = self.n_iters
+        cdef size_t n_ops = self.n_ops
 
         return {
             'buf_size': self.buf_size,
             'n_seg': n,
+            'n_unique': self.n_unique,
+            'n_ops': n_ops,
             'max_seg_len': self.max_seg_len,
             'n_iters': n_iters,
             'total_key_bytes': total_bytes,
-            # Intern string — C-level (unlocked)
-            'istr_hash_ns':         (istr_hash_t     / n_iters / n) * 1e9,
-            'istr_intern_ns':       (istr_intern_t   / n_iters / n) * 1e9,
-            'istr_intern_synced_ns':(istr_intern_s_t / n_iters / n) * 1e9,
-            'istr_lookup_ns':       (istr_lookup_t   / n_iters / n) * 1e9,
-            'istr_lookup_synced_ns':(istr_lookup_s_t / n_iters / n) * 1e9,
-            'istr_eq_ns':           (istr_eq_t       / n_iters / (n - 1)) * 1e9,
-            # Mutex overhead
+            # Intern string — C-level all-miss (fresh pool each iter)
+            'istr_hash_ns':         (istr_hash_t      / n_iters / n) * 1e9,
+            'istr_intern_ns':       (istr_intern_t    / n_iters / n) * 1e9,
+            'istr_intern_synced_ns':(istr_intern_s_t  / n_iters / n) * 1e9,
+            # Intern string — C-level lookup (all hits)
+            'istr_lookup_ns':       (istr_lookup_t    / n_iters / n) * 1e9,
+            'istr_lookup_synced_ns':(istr_lookup_s_t  / n_iters / n) * 1e9,
+            # Intern string — limited pool (realistic hit/miss mix)
+            'istr_limited_ns':         (istr_limited_t    / n_iters / n_ops) * 1e9,
+            'istr_limited_synced_ns':  (istr_limited_s_t  / n_iters / n_ops) * 1e9,
+            'istr_limited_mutex_ns':   ((istr_limited_s_t - istr_limited_t) / n_iters / n_ops) * 1e9,
+            # Mutex overhead (all-miss)
             'intern_mutex_ns':      ((istr_intern_s_t - istr_intern_t) / n_iters / n) * 1e9,
             'lookup_mutex_ns':      ((istr_lookup_s_t - istr_lookup_t) / n_iters / n) * 1e9,
+            # Equality
+            'istr_eq_ns':           (istr_eq_t        / n_iters / (n - 1)) * 1e9,
             # Python benchmarks
-            'py_unicode_ns': (py_unicode_t / n_iters / n) * 1e9,
-            'py_hash_ns':    (py_hash_t    / n_iters / n) * 1e9,
-            'py_eq_ns':      (py_eq_t      / n_iters / (n - 1)) * 1e9,
+            'py_unicode_ns':        (py_unicode_t      / n_iters / n) * 1e9,
+            'py_unicode_limited_ns':(py_unicode_lim_t  / n_iters / n_ops) * 1e9,
+            'py_hash_ns':           (py_hash_t         / n_iters / n) * 1e9,
+            'py_eq_ns':             (py_eq_t           / n_iters / (n - 1)) * 1e9,
             # Raw timings
-            'istr_hash_s':         istr_hash_t,
-            'istr_intern_s':       istr_intern_t,
-            'istr_intern_synced_s':istr_intern_s_t,
-            'istr_lookup_s':       istr_lookup_t,
-            'istr_lookup_synced_s':istr_lookup_s_t,
-            'istr_eq_s':           istr_eq_t,
-            'py_unicode_s':        py_unicode_t,
-            'py_hash_s':           py_hash_t,
-            'py_eq_s':             py_eq_t,
+            'istr_hash_s':           istr_hash_t,
+            'istr_intern_s':         istr_intern_t,
+            'istr_intern_synced_s':  istr_intern_s_t,
+            'istr_lookup_s':         istr_lookup_t,
+            'istr_lookup_synced_s':  istr_lookup_s_t,
+            'istr_limited_s':        istr_limited_t,
+            'istr_limited_synced_s': istr_limited_s_t,
+            'istr_eq_s':             istr_eq_t,
+            'py_unicode_s':          py_unicode_t,
+            'py_unicode_limited_s':  py_unicode_lim_t,
+            'py_hash_s':             py_hash_t,
+            'py_eq_s':               py_eq_t,
         }
 
 
