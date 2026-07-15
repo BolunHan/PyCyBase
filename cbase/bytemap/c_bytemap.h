@@ -210,7 +210,7 @@ static inline const char* c_bytemap_clone_key(const bytemap* map, const char* ke
     if (!map || !key) return NULL;
     if (!key_len) key_len = strlen(key);
     if (!key_len) return NULL;
-    allocator_protocol* allocator = c_ap_protocol_from_ptr((void*) map);
+    allocator_protocol* allocator = map->table ? c_ap_protocol_from_ptr((void*) map->table) : c_ap_protocol_from_ptr((void*) map);
     char*               buf = (char*) c_ap_alloc(key_len + 1, allocator);
     if (!buf) return NULL;
     memcpy(buf, key, key_len);
@@ -286,7 +286,7 @@ static inline void c_bytemap_invoke_callbacks(bytemap_callback_event event, cons
 
 static inline int c_bytemap_ex_init(bytemap* map, size_t capacity, size_t slot_capacity, allocator_protocol* allocator) {
     if (!map) return BYTEMAP_ERR_INVALID_BUF;
-    if (!c_ap_is_allocator_buf(map)) return BYTEMAP_ERR_INVALID_BUF;
+    // if (!c_ap_is_allocator_buf(map)) return BYTEMAP_ERR_INVALID_BUF;
 
     if (capacity == 0) capacity = DEFAULT_BYTEMAP_CAPACITY;
     if (capacity < MIN_BYTEMAP_CAPACITY) capacity = MIN_BYTEMAP_CAPACITY;
@@ -484,7 +484,7 @@ static inline int c_bytemap_ex_contains(const bytemap* map, const char* key, siz
 static inline int c_bytemap_ex_rehash(bytemap* map, size_t new_capacity, uint64_t seq_id) {
     if (!map || new_capacity == 0 || new_capacity > MAX_BYTEMAP_CAPACITY) return BYTEMAP_ERR_INVALID_BUF;
 
-    allocator_protocol* allocator = c_ap_protocol_from_ptr((void*) map);
+    allocator_protocol* allocator = map->table ? c_ap_protocol_from_ptr((void*) map->table) : c_ap_protocol_from_ptr((void*) map);
     size_t              entry_size = map->entry_size;
     bytemap_entry*      new_table = (bytemap_entry*) c_ap_alloc(new_capacity * entry_size, allocator);
     if (!new_table) return BYTEMAP_ERR_OOM;
