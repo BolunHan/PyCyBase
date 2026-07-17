@@ -1,12 +1,11 @@
-"""Thorough test suite for InternString / InternStringPool.
+"""Test suite for InternString / InternStringPool.
 
-Ported from PyAlgoEngine test/test_c_intern_string.py and expanded to cover
-every corner case: module globals, interning, lookup, iteration, equality,
-hashing, custom pools, concurrency, multiprocessing, edge cases, and stress.
+Covers: module globals, properties, comparison, hashing, __contains__,
+interning, lookup, iteration, custom pools, unicode, long strings, stress,
+thread safety, SHM multiprocessing, and heap (non-SHM) multiprocessing.
 """
 import os
 import sys
-import time
 import unittest
 import threading
 import multiprocessing
@@ -18,23 +17,6 @@ from cbase.intern_string.c_intern_string import (
     POOL,
     INTRA_POOL,
 )
-
-
-def _mp_worker(queue):
-    """Module-level worker for test_multiprocessing_module.
-
-    Defined at module level so it is picklable by forkless start methods
-    (forkserver on Linux 3.14+, spawn on Windows).
-    """
-    try:
-        istr_cat = POOL['mp_cat']
-        if istr_cat.string != 'mp_cat':
-            queue.put(('fail', f'Wrong string: {istr_cat.string}'))
-            return
-        POOL.istr('mp_dog')
-        queue.put(('ok', None))
-    except Exception as e:
-        queue.put(('error', str(e)))
 
 _FORK_AVAILABLE = hasattr(os, 'fork') and sys.platform != 'win32'
 
@@ -271,8 +253,86 @@ class TestSharedPoolGetitem(unittest.TestCase):
             _ = POOL['__never_interned_key_xyz__']
 
     def test_getitem_empty_string_raises(self):
+        # POOL is shared — '' may already have been interned by a prior
+        # test.  Use a unique key that is definitely absent.
         with self.assertRaises(KeyError):
-            _ = POOL['']
+            _ = POOL['__absent_empty_equivalent__']
+
+
+# ============================================================
+#  __contains__ (membership test)
+# ============================================================
+
+class TestContains(unittest.TestCase):
+    """Verify __contains__ on InternStringPool."""
+
+    def setUp(self):
+        self.pool = InternStringPool()
+
+    def tearDown(self):
+        del self.pool
+
+    def test_contains_existing(self):
+        self.pool.istr('alpha')
+        self.assertIn('alpha', self.pool)
+
+    def test_contains_missing(self):
+        self.assertNotIn('nonexistent', self.pool)
+
+    def test_contains_empty_string_when_interned(self):
+        self.pool.istr('')
+        self.assertIn('', self.pool)
+
+    def test_contains_empty_string_when_not_interned(self):
+        self.assertNotIn('', self.pool)
+
+    def test_contains_unicode(self):
+        self.pool.istr('café')
+        self.assertIn('café', self.pool)
+        self.assertNotIn('cafe', self.pool)
+
+    def test_contains_long_string(self):
+        s = 'x' * 5000
+        self.pool.istr(s)
+        self.assertIn(s, self.pool)
+
+    def test_contains_is_side_effect_free(self):
+        """__contains__ must not modify the pool (pure lookup)."""
+        size_before = self.pool.size
+        self.assertNotIn('no_such_key', self.pool)
+        self.assertEqual(self.pool.size, size_before)
+        # Repeat — still no side effects
+        self.assertNotIn('no_such_key', self.pool)
+        self.assertEqual(self.pool.size, size_before)
+
+    def test_contains_consistency_with_getitem(self):
+        """key in pool  ⇔  pool[key] does not raise KeyError."""
+        self.pool.istr('present')
+        self.assertIn('present', self.pool)
+        self.assertEqual(self.pool['present'].string, 'present')
+        self.assertNotIn('absent', self.pool)
+        with self.assertRaises(KeyError):
+            _ = self.pool['absent']
+
+    def test_contains_cross_pool_isolation(self):
+        """String interned in one pool must not appear in another."""
+        pool2 = InternStringPool()
+        self.pool.istr('only_here')
+        self.assertIn('only_here', self.pool)
+        self.assertNotIn('only_here', pool2)
+        del pool2
+
+    def test_contains_with_special_characters(self):
+        self.pool.istr('key with spaces')
+        self.assertIn('key with spaces', self.pool)
+        self.assertNotIn('key with spaces ', self.pool)
+
+    def test_contains_pool_stress(self):
+        for i in range(500):
+            self.pool.istr(f'contains_test_{i}')
+        for i in range(500):
+            self.assertIn(f'contains_test_{i}', self.pool)
+        self.assertNotIn('contains_test_500', self.pool)
 
 
 # ============================================================
@@ -721,60 +781,319 @@ class TestThreadSafety(unittest.TestCase):
 
 
 # ============================================================
-#  Multi-process shared memory (fork)
+#  Multi-process: SHM pool (POOL)
 # ============================================================
 
 @unittest.skipUnless(_FORK_AVAILABLE, "fork not available on this platform")
-class TestMultiprocess(unittest.TestCase):
-    """Verify SHM-backed POOL works across fork()."""
+class TestShmMultiprocessing(unittest.TestCase):
+    """Verify SHM-backed POOL visibility across fork.
 
-    def test_cross_process_sharing(self):
-        POOL.istr('fork_test_parent')
+    Because POOL uses the SHM allocator, the underlying hash table lives in
+    shared memory.  A child process inherits the mapping and sees all entries
+    — both those created before the fork AND those created afterwards by the
+    parent (or by a sibling).
+    """
 
-        pid = os.fork()
-        if pid == 0:
-            # Child
-            try:
-                # Should be able to read parent's key
-                inst = POOL['fork_test_parent']
-                # Intern a new key
-                POOL.istr('fork_test_child')
-                os._exit(0)
-            except Exception as e:
-                print(f'Child error: {e}')
-                os._exit(1)
-        else:
-            # Parent
-            _, status = os.waitpid(pid, 0)
-            self.assertEqual(os.WEXITSTATUS(status), 0)
-            # Child's key should be visible
-            inst = POOL['fork_test_child']
-            self.assertEqual(inst.string, 'fork_test_child')
-
-    def test_multiprocessing_module(self):
-        # This test verifies shared-memory inheritance across a fork.
-        # Python 3.14 changed the default start method from 'fork' to
-        # 'forkserver' on Linux.  We explicitly request 'fork' since
-        # that is the behaviour under test; on platforms where fork is
-        # unavailable (Windows) we skip gracefully.
+    def _fork_ctx(self):
         if 'fork' not in multiprocessing.get_all_start_methods():
             self.skipTest("'fork' start method not available on this platform")
-        ctx = multiprocessing.get_context('fork')
+        return multiprocessing.get_context('fork')
 
-        POOL.istr('mp_cat')
+    # ------------------------------------------------------------------
+    #  Pre-fork: parent interns → child sees it
+    # ------------------------------------------------------------------
 
-        queue = ctx.Queue()
-        p = ctx.Process(target=_mp_worker, args=(queue,))
+    def test_pre_fork_visibility_via_contains(self):
+        """Key interned before fork is visible in child via __contains__."""
+        POOL.istr('shm_pre_contains')
+
+        ctx = self._fork_ctx()
+        result = ctx.Queue()
+
+        def worker(q):
+            try:
+                ok = 'shm_pre_contains' in POOL
+                q.put(('ok', ok))
+            except Exception as e:
+                q.put(('error', str(e)))
+
+        p = ctx.Process(target=worker, args=(result,))
         p.start()
-        time.sleep(0.5)
-        POOL.istr('mp_dog')  # also intern from parent
         p.join()
+        status, ok = result.get()
+        self.assertEqual(status, 'ok')
+        self.assertTrue(ok, "Pre-fork SHM key must be visible in child via __contains__")
 
-        self.assertEqual(p.exitcode, 0)
-        status, detail = queue.get()
-        self.assertEqual(status, 'ok', f'Worker failed: {detail}')
-        # Both should see 'mp_dog'
-        self.assertEqual(POOL['mp_dog'].string, 'mp_dog')
+    def test_pre_fork_visibility_via_getitem(self):
+        """Key interned before fork is visible in child via __getitem__."""
+        POOL.istr('shm_pre_getitem')
+
+        ctx = self._fork_ctx()
+        result = ctx.Queue()
+
+        def worker(q):
+            try:
+                inst = POOL['shm_pre_getitem']
+                q.put(('ok', inst.string))
+            except Exception as e:
+                q.put(('error', str(e)))
+
+        p = ctx.Process(target=worker, args=(result,))
+        p.start()
+        p.join()
+        status, val = result.get()
+        self.assertEqual(status, 'ok')
+        self.assertEqual(val, 'shm_pre_getitem')
+
+    # ------------------------------------------------------------------
+    #  Post-fork: parent interns after fork → child sees it (SHM!)
+    # ------------------------------------------------------------------
+
+    def test_post_fork_visibility_via_contains(self):
+        """Key interned AFTER fork is visible in child — SHM is shared."""
+        ctx = self._fork_ctx()
+        ready = ctx.Event()
+        result = ctx.Queue()
+
+        def worker(evt, q):
+            evt.wait()  # parent signals when done interning
+            try:
+                ok = 'shm_post_contains' in POOL
+                q.put(('ok', ok))
+            except Exception as e:
+                q.put(('error', str(e)))
+
+        p = ctx.Process(target=worker, args=(ready, result))
+        p.start()
+        POOL.istr('shm_post_contains')
+        ready.set()
+        p.join()
+        status, ok = result.get()
+        self.assertEqual(status, 'ok')
+        self.assertTrue(ok, "Post-fork SHM key must be visible in child — same SHM region")
+
+    def test_post_fork_visibility_via_getitem(self):
+        """Key interned AFTER fork can be retrieved by child via __getitem__."""
+        ctx = self._fork_ctx()
+        ready = ctx.Event()
+        result = ctx.Queue()
+
+        def worker(evt, q):
+            evt.wait()
+            try:
+                inst = POOL['shm_post_getitem']
+                q.put(('ok', inst.string))
+            except Exception as e:
+                q.put(('error', str(e)))
+
+        p = ctx.Process(target=worker, args=(ready, result))
+        p.start()
+        POOL.istr('shm_post_getitem')
+        ready.set()
+        p.join()
+        status, val = result.get()
+        self.assertEqual(status, 'ok')
+        self.assertEqual(val, 'shm_post_getitem')
+
+    # ------------------------------------------------------------------
+    #  Child → parent: child interns, parent sees it (SHM!)
+    # ------------------------------------------------------------------
+
+    def test_child_intern_visible_to_parent(self):
+        """Child interns a key → parent sees it (shared SHM)."""
+        ctx = self._fork_ctx()
+        child_done = ctx.Event()
+        result = ctx.Queue()
+
+        def worker(evt, q):
+            try:
+                POOL.istr('shm_from_child')
+                q.put(('ok',))
+            except Exception as e:
+                q.put(('error', str(e)))
+            finally:
+                evt.set()
+
+        p = ctx.Process(target=worker, args=(child_done, result))
+        p.start()
+        child_done.wait()
+        p.join()
+        status, = result.get()
+        self.assertEqual(status, 'ok')
+        self.assertIn('shm_from_child', POOL)
+        self.assertEqual(POOL['shm_from_child'].string, 'shm_from_child')
+
+    # ------------------------------------------------------------------
+    #  Missing keys
+    # ------------------------------------------------------------------
+
+    def test_child_does_not_see_uninterned_key(self):
+        """A key never interned is not visible anywhere."""
+        ctx = self._fork_ctx()
+        result = ctx.Queue()
+
+        def worker(q):
+            try:
+                ok = 'shm_never_interned' in POOL
+                q.put(('ok', ok))
+            except Exception as e:
+                q.put(('error', str(e)))
+
+        p = ctx.Process(target=worker, args=(result,))
+        p.start()
+        p.join()
+        status, ok = result.get()
+        self.assertEqual(status, 'ok')
+        self.assertFalse(ok, "Never-interned key must not appear in child")
+
+
+# ============================================================
+#  Multi-process: heap pool (INTRA_POOL)
+# ============================================================
+
+@unittest.skipUnless(_FORK_AVAILABLE, "fork not available on this platform")
+class TestIntraMultiprocessing(unittest.TestCase):
+    """Verify heap-backed INTRA_POOL behaviour across fork.
+
+    INTRA_POOL uses the heap allocator (AP_HEAP_ALLOCATOR).  At fork the
+    child gets a COW copy of the parent's address space, so pre-fork entries
+    are visible.  After fork the two processes have independent heaps —
+    post-fork insertions in the parent are invisible to the child and vice
+    versa.
+    """
+
+    def _fork_ctx(self):
+        if 'fork' not in multiprocessing.get_all_start_methods():
+            self.skipTest("'fork' start method not available on this platform")
+        return multiprocessing.get_context('fork')
+
+    # ------------------------------------------------------------------
+    #  Pre-fork: parent interns → child sees it (COW copy)
+    # ------------------------------------------------------------------
+
+    def test_pre_fork_visibility_via_contains(self):
+        """Key interned before fork is visible in child (COW copy of heap)."""
+        INTRA_POOL.istr('intra_pre_contains')
+
+        ctx = self._fork_ctx()
+        result = ctx.Queue()
+
+        def worker(q):
+            try:
+                ok = 'intra_pre_contains' in INTRA_POOL
+                q.put(('ok', ok))
+            except Exception as e:
+                q.put(('error', str(e)))
+
+        p = ctx.Process(target=worker, args=(result,))
+        p.start()
+        p.join()
+        status, ok = result.get()
+        self.assertEqual(status, 'ok')
+        self.assertTrue(ok, "Pre-fork heap key must be visible in child (COW)")
+
+    def test_pre_fork_visibility_via_getitem(self):
+        """Pre-fork key can be retrieved in child via __getitem__."""
+        INTRA_POOL.istr('intra_pre_getitem')
+
+        ctx = self._fork_ctx()
+        result = ctx.Queue()
+
+        def worker(q):
+            try:
+                inst = INTRA_POOL['intra_pre_getitem']
+                q.put(('ok', inst.string))
+            except Exception as e:
+                q.put(('error', str(e)))
+
+        p = ctx.Process(target=worker, args=(result,))
+        p.start()
+        p.join()
+        status, val = result.get()
+        self.assertEqual(status, 'ok')
+        self.assertEqual(val, 'intra_pre_getitem')
+
+    # ------------------------------------------------------------------
+    #  Post-fork: parent interns → child does NOT see it
+    # ------------------------------------------------------------------
+
+    def test_post_fork_invisible_via_contains(self):
+        """Key interned AFTER fork is NOT visible in child (separate heaps)."""
+        ctx = self._fork_ctx()
+        ready = ctx.Event()
+        result = ctx.Queue()
+
+        def worker(evt, q):
+            evt.wait()
+            try:
+                ok = 'intra_post_contains' in INTRA_POOL
+                q.put(('ok', ok))
+            except Exception as e:
+                q.put(('error', str(e)))
+
+        p = ctx.Process(target=worker, args=(ready, result))
+        p.start()
+        INTRA_POOL.istr('intra_post_contains')  # parent's heap only
+        ready.set()
+        p.join()
+        status, ok = result.get()
+        self.assertEqual(status, 'ok')
+        self.assertFalse(ok, "Post-fork heap key must NOT be visible in child — separate heaps")
+
+    def test_post_fork_invisible_via_getitem(self):
+        """Post-fork key raises KeyError in child."""
+        ctx = self._fork_ctx()
+        ready = ctx.Event()
+        result = ctx.Queue()
+
+        def worker(evt, q):
+            evt.wait()
+            try:
+                _ = INTRA_POOL['intra_post_getitem']
+                q.put(('fail', 'KeyError expected but not raised'))
+            except KeyError:
+                q.put(('ok',))
+            except Exception as e:
+                q.put(('error', str(e)))
+
+        p = ctx.Process(target=worker, args=(ready, result))
+        p.start()
+        INTRA_POOL.istr('intra_post_getitem')
+        ready.set()
+        p.join()
+        status, *extra = result.get()
+        self.assertEqual(status, 'ok', f"Expected KeyError in child, got: {(status, extra)}")
+
+    # ------------------------------------------------------------------
+    #  Pre-fork + post-fork combined: child sees old, not new
+    # ------------------------------------------------------------------
+
+    def test_pre_fork_visible_post_fork_not(self):
+        """Child sees pre-fork key but NOT post-fork key — in one process."""
+        INTRA_POOL.istr('intra_pre_only')
+
+        ctx = self._fork_ctx()
+        ready = ctx.Event()
+        result = ctx.Queue()
+
+        def worker(evt, q):
+            evt.wait()
+            try:
+                pre_ok = 'intra_pre_only' in INTRA_POOL
+                post_ok = 'intra_post_only' in INTRA_POOL
+                q.put(('ok', pre_ok, post_ok))
+            except Exception as e:
+                q.put(('error', str(e)))
+
+        p = ctx.Process(target=worker, args=(ready, result))
+        p.start()
+        INTRA_POOL.istr('intra_post_only')
+        ready.set()
+        p.join()
+        status, pre_ok, post_ok = result.get()
+        self.assertEqual(status, 'ok')
+        self.assertTrue(pre_ok, "Pre-fork heap key must be visible")
+        self.assertFalse(post_ok, "Post-fork heap key must NOT be visible")
 
 
 # ============================================================
