@@ -88,6 +88,12 @@ cdef class InternStringPool:
             raise KeyError(f'{key} not interned')
         return InternString.c_from_entry(entry, self)
 
+    def __contains__(self, str key):
+        cdef Py_ssize_t key_length = 0
+        cdef const char* utf8_string = PyUnicode_AsUTF8AndSize(key, &key_length)
+        cdef const istr_entry* entry = c_istr_map_lookup_synced(self.pool, utf8_string, <size_t> key_length)
+        return entry != NULL
+
     cpdef InternString istr(self, str string):
         cdef Py_ssize_t key_length = 0
         cdef const char* utf8_string = PyUnicode_AsUTF8AndSize(string, &key_length)
@@ -135,9 +141,15 @@ cdef class IstrTestToolkit:
         Number of benchmark iterations (default 10).
     """
 
-    def __cinit__(self, size_t buf_size=2**30, size_t n_seg=100_000,
-                  size_t max_seg_len=64, size_t n_iters=10,
-                  size_t n_unique=0, size_t n_ops=0):
+    def __cinit__(
+            self,
+            size_t buf_size=2**30,
+            size_t n_seg=100_000,
+            size_t max_seg_len=64,
+            size_t n_iters=10,
+            size_t n_unique=0,
+            size_t n_ops=0
+    ):
         from random import seed, randint
         cdef size_t i
 
