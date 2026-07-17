@@ -256,14 +256,17 @@ def sync_project(cfg, client: NTClient):
 
     # Remote extract
     cmd_info("Extracting on remote ...")
-    # Ensure target directory exists, remove old project, extract
-    extract_cmd = (
-        f"if not exist \"{remote_root}\" mkdir \"{remote_root}\" && "
-        f"tar xzf \"{remote_tarball}\" -C \"{remote_parent}\" && "
-        f"del \"{remote_tarball}\""
+    # Mirror semantics: remove the old tree, extract fresh, delete the tarball.
+    # Done in PowerShell — cmd.exe `if ... && ...` chains have precedence and
+    # quoting pitfalls (the && binds into the if-body, silently skipping steps).
+    extract_ps = (
+        f"$ErrorActionPreference='Stop'; "
+        f"if (Test-Path '{remote_root}') {{ Remove-Item -Recurse -Force '{remote_root}' }}; "
+        f"tar xzf '{remote_tarball}' -C '{remote_parent}'; "
+        f"if ($LASTEXITCODE -ne 0) {{ exit $LASTEXITCODE }}; "
+        f"Remove-Item -Force '{remote_tarball}'"
     )
-    # Use cmd.exe directly (tar works in cmd)
-    exit_code, stdout, stderr = client.exec_cmd(extract_cmd)
+    exit_code, stdout, stderr = client.exec_powershell(extract_ps)
     if exit_code != 0:
         cmd_fail(f"Extract failed (exit {exit_code})")
         if stdout.strip():
