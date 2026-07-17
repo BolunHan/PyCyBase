@@ -42,8 +42,3 @@ include = ["cbase*"]
 [tool.setuptools.dynamic]
 version = { attr = "cbase.__version__" }
 
-[[tool.cibuildwheel.overrides]]
-select = "cp314-manylinux*"
-manylinux-x86-64-image = "manylinux_2_34"
-manylinux-aarch64-image = "manylinux_2_34"
-manylinux-i686-image = "manylinux_2_34"
