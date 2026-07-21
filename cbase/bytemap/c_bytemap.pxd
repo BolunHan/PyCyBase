@@ -14,12 +14,15 @@ cdef extern from "Python.h":
     PyObject* PyDict_GetItem(PyObject* p, PyObject* key)
     int PyDict_SetItem(PyObject* p, PyObject* key, PyObject* val)
     int PyDict_DelItem(PyObject* p, PyObject* key)
-    int PyDict_Pop(PyObject* p, PyObject* key, PyObject** result)
     void PyDict_Clear(PyObject* p)
     int PyDict_SetItemString(PyObject* p, const char* key, PyObject* val)
     PyObject* PyDict_GetItemString(PyObject* p, const char* key)
     PyObject* PyFloat_FromDouble(double v)
     void PyErr_Clear()
+
+
+cdef extern from "cbase/backports/py_backports.h":
+    int BP_PyDict_Pop(PyObject* p, PyObject* key, PyObject** result)
 
 
 cdef extern from "cbase/bytemap/c_bytemap.h":
@@ -97,10 +100,7 @@ cdef extern from "cbase/bytemap/c_bytemap.h":
     bytemap_entry* c_bytemap_entry_at(const bytemap* bmap, size_t idx) noexcept nogil
     bytemap_entry* c_bytemap_entry_next(const bytemap* bmap, bytemap_entry* entry) noexcept nogil
     bytemap_entry* c_bytemap_entry_first(const bytemap* bmap) noexcept nogil
-    void c_bytemap_invoke_callbacks(bytemap_callback_event event, const bytemap* bmap,
-                                     const char* key, size_t key_len,
-                                     const char* value, size_t value_len,
-                                     uint64_t seq_id) noexcept nogil
+    void c_bytemap_invoke_callbacks(bytemap_callback_event event, const bytemap* bmap, const char* key, size_t key_len, const char* value, size_t value_len, uint64_t seq_id) noexcept nogil
 
     int c_bytemap_ex_init(bytemap* bmap, size_t capacity, size_t slot_capacity, allocator_protocol* allocator) noexcept nogil
     void c_bytemap_ex_dealloc(bytemap* bmap) noexcept nogil
@@ -113,13 +113,9 @@ cdef extern from "cbase/bytemap/c_bytemap.h":
     int c_bytemap_ex_get_ptr(const bytemap* bmap, const char* key, size_t key_len, char** out, size_t* out_len) noexcept nogil
     int c_bytemap_ex_contains(const bytemap* bmap, const char* key, size_t key_len) noexcept nogil
     int c_bytemap_ex_rehash(bytemap* bmap, size_t new_capacity, uint64_t seq_id) noexcept nogil
-    int c_bytemap_ex_set(bytemap* bmap, const char* key, size_t key_len,
-                          const char* value, size_t value_len, uint64_t seq_id,
-                          bytemap_entry** out) noexcept nogil
-    int c_bytemap_ex_pop(bytemap* bmap, const char* key, size_t key_len,
-                          uint64_t seq_id, char* out, size_t* out_len) noexcept nogil
-    int c_bytemap_ex_pop_ptr(bytemap* bmap, const char* key, size_t key_len,
-                               uint64_t seq_id, char** out, size_t* out_len) noexcept nogil
+    int c_bytemap_ex_set(bytemap* bmap, const char* key, size_t key_len, const char* value, size_t value_len, uint64_t seq_id, bytemap_entry** out) noexcept nogil
+    int c_bytemap_ex_pop(bytemap* bmap, const char* key, size_t key_len, uint64_t seq_id, char* out, size_t* out_len) noexcept nogil
+    int c_bytemap_ex_pop_ptr(bytemap* bmap, const char* key, size_t key_len, uint64_t seq_id, char** out, size_t* out_len) noexcept nogil
     size_t c_bytemap_ex_len(const bytemap* bmap) noexcept nogil
     bytemap* c_bytemap_ex_clone(const bytemap* src, allocator_protocol* allocator) noexcept nogil
 

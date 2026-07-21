@@ -1126,7 +1126,7 @@ cdef class _BoundByteMapBase(dict):
         cdef const char* c_key = self.c_serialize_key(py_key, &c_key_len)
         cdef PyObject* py_value = NULL
 
-        if PyDict_Pop(<PyObject*> self, <PyObject*> py_key, &py_value) < 0:
+        if BP_PyDict_Pop(<PyObject*> self, <PyObject*> py_key, &py_value) < 0:
             PyErr_Clear()
 
         cdef char* c_value = NULL
