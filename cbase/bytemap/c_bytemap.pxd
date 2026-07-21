@@ -21,10 +21,6 @@ cdef extern from "Python.h":
     void PyErr_Clear()
 
 
-cdef extern from "cbase/backports/py_backports.h":
-    int BP_PyDict_Pop(PyObject* p, PyObject* key, PyObject** result)
-
-
 cdef extern from "cbase/bytemap/c_bytemap.h":
     const size_t MIN_BYTEMAP_CAPACITY
     const size_t DEFAULT_BYTEMAP_CAPACITY

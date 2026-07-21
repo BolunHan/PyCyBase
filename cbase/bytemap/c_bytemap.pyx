@@ -8,6 +8,8 @@ from libc.stdlib cimport calloc, free
 from libc.string cimport memset
 
 from cbase.allocator_protocol.c_allocator_protocol cimport AP_DEFAULT_ALLOCATOR
+from cbase.backports.pydict cimport BP_PyDict_Pop
+
 
 cdef object NO_DEFAULT = object()
 cdef bytes NO_DEFAULT_BYTES = b''
