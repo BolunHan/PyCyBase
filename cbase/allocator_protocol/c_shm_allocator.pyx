@@ -416,7 +416,6 @@ cdef class SharedMemoryAllocator:
             return PyUnicode_FromString(self.ctx.shm_allocator.shm_prefix)
 
 
-# Wrap the singleton allocator created by c_shm_comp.pyx.
 cdef SharedMemoryAllocator ALLOCATOR = SharedMemoryAllocator.c_from_header(C_SHM_COMP, False)
 cdef shm_allocator_ctx* C_ALLOCATOR = C_SHM_COMP
 
