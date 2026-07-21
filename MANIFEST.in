@@ -1,3 +1,22 @@
-include cbase/allocator_protocol/*.h
-include cbase/allocator_protocol/*.pxd
-include cbase/allocator_protocol/*.pyi
+# Root-level metadata and build files
+include *.py *.toml *.md *.txt *.json Makefile *.ps1 *.sh
+
+# All source files across cbase packages
+recursive-include cbase *.py *.pyx *.pxd *.pyi *.h *.c *.cpp *.md
+
+# Documentation
+recursive-include docs *.py *.rst
+prune docs/_build
+
+# Test suite
+recursive-include tests *.py
+
+# CI / workflows
+recursive-include .github *.yml *.yaml
+
+# Exclude build artifacts and generated trees
+prune cbase/includes
+global-exclude __pycache__
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *.so
