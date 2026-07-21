@@ -154,16 +154,19 @@ cdef class IstrTestToolkit:
         cdef size_t i
 
         if max_seg_len < 1 or max_seg_len > buf_size // n_seg:
-            raise ValueError(f'Invalid max_seg_len={max_seg_len} for '
-                             f'buf_size={buf_size}, n_seg={n_seg}')
+            raise ValueError(f'Invalid max_seg_len={max_seg_len} for buf_size={buf_size}, n_seg={n_seg}')
         if n_seg == 0 or buf_size == 0 or n_iters == 0:
             raise ValueError('buf_size, n_seg, n_iters must be > 0')
+        if n_unique == 0:
+            n_unique = n_seg // 10
+            if n_unique < 1:
+                n_unique = 1
 
         self.buf_size = buf_size
         self.n_seg = n_seg
         self.max_seg_len = max_seg_len
         self.n_iters = n_iters
-        self.n_unique = n_unique if n_unique > 0 else max(n_seg // 10, 1)
+        self.n_unique = n_unique
         self.n_ops = n_ops if n_ops > 0 else n_seg
         if self.n_unique > n_seg:
             raise ValueError(f'n_unique={n_unique} must be <= n_seg={n_seg}')
@@ -300,7 +303,7 @@ cdef class IstrTestToolkit:
         cdef double elapsed = 0.0
         cdef double start_ts
         cdef istr_map* cmap
-        cdef const istr_entry* entry
+        cdef const istr_entry* entry = NULL
         cdef uintptr_t checksum = 0
 
         from time import perf_counter
@@ -327,7 +330,7 @@ cdef class IstrTestToolkit:
         cdef double elapsed = 0.0
         cdef double start_ts
         cdef istr_map* cmap
-        cdef const istr_entry* entry
+        cdef const istr_entry* entry = NULL
         cdef uintptr_t checksum = 0
 
         from time import perf_counter
@@ -353,7 +356,7 @@ cdef class IstrTestToolkit:
         cdef size_t iter_idx, i
         cdef double elapsed = 0.0
         cdef double start_ts
-        cdef const istr_entry* entry
+        cdef const istr_entry* entry = NULL
         cdef uintptr_t checksum = 0
 
         from time import perf_counter
@@ -375,7 +378,7 @@ cdef class IstrTestToolkit:
         cdef size_t iter_idx, i
         cdef double elapsed = 0.0
         cdef double start_ts
-        cdef const istr_entry* entry
+        cdef const istr_entry* entry = NULL
         cdef uintptr_t checksum = 0
 
         from time import perf_counter
@@ -510,7 +513,7 @@ cdef class IstrTestToolkit:
         cdef double elapsed = 0.0
         cdef double start_ts
         cdef istr_map* cmap
-        cdef const istr_entry* entry
+        cdef const istr_entry* entry = NULL
         cdef uintptr_t checksum = 0
 
         from time import perf_counter
@@ -535,7 +538,7 @@ cdef class IstrTestToolkit:
         cdef double elapsed = 0.0
         cdef double start_ts
         cdef istr_map* cmap
-        cdef const istr_entry* entry
+        cdef const istr_entry* entry = NULL
         cdef uintptr_t checksum = 0
 
         from time import perf_counter
@@ -630,7 +633,7 @@ cdef class IstrTestToolkit:
         cdef double elapsed = 0.0
         cdef double start_ts
         cdef istr_map* cmap
-        cdef const istr_entry* entry
+        cdef const istr_entry* entry = NULL
         cdef uintptr_t checksum = 0
 
         self.c_gen_miss_pattern(miss_rate)
