@@ -19,12 +19,7 @@ PACKAGE_NAME = "cbase"
 DISPLAY_NAME = "PyCyBase"
 
 WITH_ANNOTATION = False
-if platform.system() == "Windows":
-    COMPILE_FLAGS = ["/Ox", "/std:c17", "/experimental:c11atomics"]
-else:
-    COMPILE_FLAGS = ['-O3']
-    if not os.getenv("CI"):
-        COMPILE_FLAGS.append('-march=native')
+COMPILE_FLAGS = ["/Ox", "/std:c17", "/experimental:c11atomics"] if platform.system() == "Windows" else ['-O3', '-march=native']
 REPO_ROOT = os.path.abspath(os.path.dirname(__file__))
 N_CORES = os.cpu_count() or 1
 N_THREADS = 0 if platform.system() == "Windows" else max(1, N_CORES - 2)
