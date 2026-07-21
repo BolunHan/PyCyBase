@@ -2,3 +2,4 @@
 /cbase/bytemap/__init__.pxd
 /cbase/intern_string/__init__.pxd
 /cbase/__init__.pxd
+/cbase/backports/__init__.pxd
