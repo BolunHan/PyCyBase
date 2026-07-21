@@ -39,6 +39,7 @@ class BuildExtWithConfig(build_ext):
     __cy_modules__ = [
         "cbase",
         "cbase.allocator_protocol",
+        "cbase.backports",
         "cbase.bytemap",
         "cbase.intern_string",
     ]
