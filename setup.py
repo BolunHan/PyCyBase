@@ -22,8 +22,9 @@ if platform.system() == "Windows":
     COMPILE_FLAGS = ["/Ox", "/std:c17", "/experimental:c11atomics"]
 else:
     COMPILE_FLAGS = ['-O3']
-    if not os.environ.get('GITHUB_ACTIONS'):
+    if not os.environ.get('CIBW_BUILD'):
         COMPILE_FLAGS.append('-march=native')
+    print(f"[build] COMPILE_FLAGS = {COMPILE_FLAGS}")
 REPO_ROOT = os.path.abspath(os.path.dirname(__file__))
 N_CORES = os.cpu_count() or 1
 N_THREADS = 0 if platform.system() == "Windows" else max(1, N_CORES - 2)
