@@ -14,6 +14,7 @@ from setuptools.command.build_ext import build_ext
 # Setup Configuration
 # ==============================
 
+BUILD_SCRIPT_VERSION = "0.2.1.post1"
 PACKAGE_NAME = "cbase"
 DISPLAY_NAME = "PyCyBase"
 
@@ -22,9 +23,8 @@ if platform.system() == "Windows":
     COMPILE_FLAGS = ["/Ox", "/std:c17", "/experimental:c11atomics"]
 else:
     COMPILE_FLAGS = ['-O3']
-    if not os.environ.get('CIBW_BUILD'):
+    if not os.path.isdir('/opt/_internal'):
         COMPILE_FLAGS.append('-march=native')
-    print(f"[build] COMPILE_FLAGS = {COMPILE_FLAGS}")
 REPO_ROOT = os.path.abspath(os.path.dirname(__file__))
 N_CORES = os.cpu_count() or 1
 N_THREADS = 0 if platform.system() == "Windows" else max(1, N_CORES - 2)
@@ -72,6 +72,7 @@ class BuildExtWithConfig(build_ext):
         super().build_extensions()
 
     def pre_compile(self):
+        print(f"[build_py] setup.py v{BUILD_SCRIPT_VERSION}")
         self.collect_sources()
 
     def post_compile(self):
