@@ -1,9 +1,30 @@
 param(
-    [string]$VenvPath = "C:\Users\Hanlun Fintech\Projects\venv_313"
+    [string]$VenvPath = ""
 )
 
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ConfigPath = Join-Path $ScriptDir "nt_config.json"
+
+# --- Resolve venv path ---
+if ($VenvPath) {
+    if ($env:VIRTUAL_ENV -and ($env:VIRTUAL_ENV -ne $VenvPath)) {
+        [Console]::Error.WriteLine("[WARNING] -VenvPath '$VenvPath' differs from activated venv '$env:VIRTUAL_ENV'. Using -VenvPath.")
+    }
+    [Console]::Error.WriteLine("[venv] (-VenvPath) $VenvPath")
+} elseif ($env:VIRTUAL_ENV) {
+    $VenvPath = $env:VIRTUAL_ENV
+    [Console]::Error.WriteLine("[venv] (activated) $VenvPath")
+} elseif (Test-Path $ConfigPath) {
+    $config = Get-Content $ConfigPath -Raw | ConvertFrom-Json
+    $VenvPath = $config.windows.venv_path
+    [Console]::Error.WriteLine("[venv] (nt_config.json) $VenvPath")
+}
+
+if (-not $VenvPath) {
+    Write-Host "[ERROR] No venv found. Use -VenvPath, activate a venv, or set windows.venv_path in nt_config.json" -ForegroundColor Red
+    exit 1
+}
 
 Write-Host "==============================================" -ForegroundColor Cyan
 Write-Host " PyCyBase NT Build Script" -ForegroundColor Cyan
