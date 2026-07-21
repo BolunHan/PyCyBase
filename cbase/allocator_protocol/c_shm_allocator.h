@@ -263,8 +263,8 @@ static inline void c_shm_allocator_name(const void* region, const char* shm_pref
 static inline void c_shm_page_name(shm_allocator* allocator, char* out) {
     pid_t  pid = getpid();
     size_t page_idx = allocator->mapped_pages;
-    // The shm name should be in format of {prefix}_pg_{pid_hex}_{page_idx_hex}
-    snprintf(out, AP_SHM_NAME_LEN, "%s_pg_%lx_%zx", allocator->shm_prefix, (long) pid, page_idx);
+    // The shm name should be in format of {prefix}_pg_{pid_hex}_{region_hex}_{page_idx_hex}
+    snprintf(out, AP_SHM_NAME_LEN, "%s_pg_%lx_%lx_%zx", allocator->shm_prefix, (long) pid, (unsigned long) allocator->region, page_idx);
 }
 
 static inline int c_shm_scan(const char* prefix, char* out) {

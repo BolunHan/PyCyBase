@@ -168,7 +168,7 @@ static inline void c_nt_shm_allocator_name(const char* shm_prefix, char* out) {
 static inline void c_nt_shm_page_name(nt_shm_allocator* allocator, char* out) {
     DWORD  pid = GetCurrentProcessId();
     size_t page_idx = allocator->mapped_pages;
-    snprintf(out, AP_SHM_NAME_LEN, "%s_pg_%lx_%zx", allocator->shm_prefix, (unsigned long) pid, page_idx);
+    snprintf(out, AP_SHM_NAME_LEN, "%s_pg_%lx_%lx_%zx", allocator->shm_prefix, (unsigned long) pid, (unsigned long) (uintptr_t) allocator, page_idx);
 }
 
 static inline void c_nt_shm_mutex_name(const char* shm_prefix, char* out) {
