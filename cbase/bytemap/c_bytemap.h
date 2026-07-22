@@ -852,4 +852,16 @@ static inline double c_bytemap_entry_value_as_double(const bytemap_entry* entry)
     return *(double*) entry->value;
 }
 
+static inline void c_bytemap_entry_value_from_ptr(bytemap_entry* entry, const void* ptr) {
+    memcpy(entry->value, &ptr, sizeof(void*));
+}
+
+static inline void c_bytemap_entry_value_from_uintptr(bytemap_entry* entry, uintptr_t val) {
+    c_bytemap_entry_value_from_ptr(entry, (const void*) val);
+}
+
+static inline void c_bytemap_entry_value_from_double(bytemap_entry* entry, double val) {
+    memcpy(entry->value, &val, sizeof(double));
+}
+
 #endif  // C_CBASE_BYTEMAP_H

@@ -31,6 +31,8 @@ from .c_bytemap cimport (
     c_bytemap_entry_value,
     c_bytemap_entry_value_as_ptr, c_bytemap_entry_value_as_uintptr,
     c_bytemap_entry_value_as_double,
+    c_bytemap_entry_value_from_ptr, c_bytemap_entry_value_from_uintptr,
+    c_bytemap_entry_value_from_double,
 
     _ByteMapBase,
     ByteMapEx, ByteMapExDouble, ByteMap,
