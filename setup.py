@@ -219,6 +219,12 @@ cython_extension.extend([
         extra_compile_args=COMPILE_FLAGS,
         include_dirs=[REPO_ROOT]
     ),
+    Extension(
+        name="cbase.backports.pylong",
+        sources=["cbase/backports/pylong.pyx"],
+        extra_compile_args=COMPILE_FLAGS,
+        include_dirs=[REPO_ROOT]
+    ),
 ])
 
 if _IS_WINDOWS:
