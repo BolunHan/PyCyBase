@@ -90,7 +90,7 @@ typedef enum bytemap_callback_event {
  */
 typedef void (*bytemap_callback_func)(bytemap_callback_event event, const char* key, size_t key_len, const char* value, size_t value_len, uint64_t seq_id, void* user_data);
 
-// Legacy alias — single unified callback type.
+// Legacy alias -- single unified callback type.
 typedef bytemap_callback_func bytemap_ex_callback_func;
 
 typedef struct bytemap_callback_ctx {
@@ -100,7 +100,7 @@ typedef struct bytemap_callback_ctx {
     struct bytemap_callback_ctx* next;
 } bytemap_callback_ctx;
 
-// Legacy alias — single unified callback context.
+// Legacy alias -- single unified callback context.
 typedef bytemap_callback_ctx bytemap_ex_callback_ctx;
 
 /**

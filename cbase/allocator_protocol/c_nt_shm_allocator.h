@@ -601,7 +601,7 @@ static inline nt_shm_page_ctx* c_nt_shm_allocator_extend(nt_shm_allocator_ctx* c
  * @return Allocator context or NULL on failure.
  */
 static inline nt_shm_allocator_ctx* c_nt_shm_allocator_new(size_t region_size, const char* shm_prefix) {
-    (void) region_size;  // Not used on NT — pages are independently mapped
+    (void) region_size;  // Not used on NT -- pages are independently mapped
 
     nt_shm_allocator_ctx* ctx = (nt_shm_allocator_ctx*) calloc(1, sizeof(nt_shm_allocator_ctx));
     if (!ctx) return NULL;

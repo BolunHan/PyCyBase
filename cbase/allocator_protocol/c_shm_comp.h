@@ -2,10 +2,10 @@
 #define C_SHM_COMP_H
 
 /**
- * c_shm_comp.h — Platform-dispatch compatibility header for SHM allocators.
+ * c_shm_comp.h -- Platform-dispatch compatibility header for SHM allocators.
  *
  * On POSIX:   includes c_shm_allocator.h directly.
- * On Windows: includes c_nt_shm_allocator.h and aliases nt_shm_* → shm_*.
+ * On Windows: includes c_nt_shm_allocator.h and aliases nt_shm_* -> shm_*.
  *
  * This header exists so that Cython .pxd / .pyx files can declare SHM types
  * via a single `cdef extern from "cbase/allocator_protocol/c_shm_comp.h"`
@@ -21,7 +21,7 @@ typedef nt_shm_page          shm_page;
 typedef nt_shm_page_ctx      shm_page_ctx;
 typedef nt_shm_memory_block  shm_memory_block;
 
-// Static inline wrappers — visible to Cython .pxd files (unlike #define macros).
+// Static inline wrappers -- visible to Cython .pxd files (unlike #define macros).
 static inline shm_allocator_ctx* c_shm_allocator_new(size_t region_size, const char* shm_prefix) {
     return (shm_allocator_ctx*) c_nt_shm_allocator_new(region_size, shm_prefix);
 }
@@ -43,7 +43,7 @@ static inline void c_shm_reclaim(shm_allocator_ctx* ctx, pthread_mutex_t* lock) 
 
 #else
 #include "cbase/allocator_protocol/c_shm_allocator.h"
-// Functions are already defined in c_shm_allocator.h — no wrappers needed.
+// Functions are already defined in c_shm_allocator.h -- no wrappers needed.
 #endif
 
 #endif  // C_SHM_COMP_H

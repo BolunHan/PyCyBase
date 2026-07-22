@@ -26,12 +26,12 @@ static inline int c_i128_cmp(const int128_t v1, const int128_t v2) {
 }
 #else
 /**
- * @brief MSVC has no native 128-bit integer — emulate with a two-limb
+ * @brief MSVC has no native 128-bit integer -- emulate with a two-limb
  *        little-endian struct (memory layout identical to __uint128_t on
  *        x86-64, so 16-byte ID slots stay byte-compatible).
  *
  * The Cython boundary converts via int.to_bytes/from_bytes, so no 128-bit
- * arithmetic is required — only 16-byte round-trips and ordered comparison.
+ * arithmetic is required -- only 16-byte round-trips and ordered comparison.
  */
 typedef struct {
     uint64_t lo;

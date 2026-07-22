@@ -11,13 +11,13 @@
 
 #ifdef _WIN32
 #include <cbase/allocator_protocol/c_nt_shm_allocator.h>
-// Type aliases — NT structs masquerade as POSIX names
+// Type aliases -- NT structs masquerade as POSIX names
 typedef nt_shm_allocator     shm_allocator;
 typedef nt_shm_allocator_ctx shm_allocator_ctx;
 typedef nt_shm_page          shm_page;
 typedef nt_shm_page_ctx      shm_page_ctx;
 typedef nt_shm_memory_block  shm_memory_block;
-// Function aliases — NT implementations with identical signatures
+// Function aliases -- NT implementations with identical signatures
 #define c_shm_allocator_new c_nt_shm_allocator_new
 #define c_shm_allocator_free c_nt_shm_allocator_free
 #define c_shm_request c_nt_shm_request

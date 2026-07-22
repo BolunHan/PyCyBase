@@ -2,7 +2,7 @@
 #define C_CBASE_INTERN_STRING_H
 
 /**
- * c_intern_string.h — Intern string pool.
+ * c_intern_string.h -- Intern string pool.
  *
  * Ported from PyAlgoEngine's algo_engine/base/c_intern_string.h.
  *
@@ -12,11 +12,11 @@
  *     Original open-addressing hash map with linear probing,
  *     power-of-two capacity, and internal pthread_mutex_t.
  *     istr_entry and istr_map are self-contained structs.
- *     Faithfully ported from PyAlgoEngine — identical algorithm.
+ *     Faithfully ported from PyAlgoEngine -- identical algorithm.
  *
  *   Bytemap-backed (ISTR_USE_BYTEMAP_BACKEND == 1):
  *     istr_entry and istr_map are direct typedefs to bytemap_entry
- *     and bytemap — zero wrapper overhead, one fewer dereference.
+ *     and bytemap -- zero wrapper overhead, one fewer dereference.
  *     Thread safety is managed at the Cython layer; _synced
  *     variants are pass-through stubs.
  *
@@ -345,7 +345,7 @@ static inline const istr_entry* c_istr_map_lookup(const istr_map* map, const cha
     istr_entry* table = map->table;
     istr_entry* entry = table + idx;
 
-    // Step 2: Search — length shortcut + memcmp (no strcmp)
+    // Step 2: Search -- length shortcut + memcmp (no strcmp)
     while (entry->key) {
         if (entry->hash == hash && entry->key_length == key_length && memcmp(entry->key, key, key_length) == 0) {
             return entry;
@@ -425,8 +425,8 @@ static inline const char* c_istr_synced(istr_map* map, const char* key, size_t k
 
 // ==================================================================
 //  Backend: Bytemap-backed
-//  — istr_entry = bytemap_entry (direct typedef)
-//  — istr_map wraps bytemap as first field + pthread_mutex_t,
+//  -- istr_entry = bytemap_entry (direct typedef)
+//  -- istr_map wraps bytemap as first field + pthread_mutex_t,
 //    so (bytemap*)map == &map->base and _synced variants lock
 //    map->lock exactly like the native backend.
 // ==================================================================
@@ -478,7 +478,7 @@ static inline void c_istr_map_free(istr_map* map) {
 }
 
 // ------------------------------------------------------------------
-//  Extend (mirrors native: determine capacity → rehash, with lock)
+//  Extend (mirrors native: determine capacity -> rehash, with lock)
 // ------------------------------------------------------------------
 
 static inline int c_istr_map_extend(istr_map* map, size_t new_capacity) {
@@ -524,7 +524,7 @@ static inline int c_istr_map_extend_synced(istr_map* map, size_t new_capacity) {
 }
 
 // ------------------------------------------------------------------
-//  Lookup — single linear probe, same structure as native.
+//  Lookup -- single linear probe, same structure as native.
 //  Uses bytemap's table layout and XXH3 hash (with per-map salt).
 // ------------------------------------------------------------------
 
@@ -544,7 +544,7 @@ static inline const istr_entry* c_istr_map_lookup(const istr_map* map, const cha
     size_t      start = idx;
     istr_entry* entry = c_bytemap_entry_at(&map->base, idx);
 
-    // Step 3: Linear probe — length shortcut + memcmp
+    // Step 3: Linear probe -- length shortcut + memcmp
     while (entry->occupied || entry->removed) {
         if (entry->occupied && entry->key_length == key_length && memcmp(entry->key, key, key_length) == 0) {
             return entry;
@@ -566,7 +566,7 @@ static inline const istr_entry* c_istr_map_lookup_synced(const istr_map* map, co
 }
 
 // ------------------------------------------------------------------
-//  Intern — delegates to c_bytemap_ex_set which handles hash,
+//  Intern -- delegates to c_bytemap_ex_set which handles hash,
 //  linear probe, auto-rehash, key cloning, and insertion order.
 // ------------------------------------------------------------------
 
