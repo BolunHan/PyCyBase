@@ -189,7 +189,9 @@ static inline bytemap_entry* c_bytemap_last(const bytemap* map);
 static inline bytemap_entry* c_bytemap_next(const bytemap_entry* entry);
 static inline bytemap_entry* c_bytemap_prev(const bytemap_entry* entry);
 static inline void*          c_bytemap_entry_value(const bytemap_entry* entry);
-static inline void*          c_bytemap_entry_value_raw(const bytemap_entry* entry);
+static inline void*          c_bytemap_entry_value_as_ptr(const bytemap_entry* entry);
+static inline uintptr_t      c_bytemap_entry_value_as_uintptr(const bytemap_entry* entry);
+static inline double         c_bytemap_entry_value_as_double(const bytemap_entry* entry);
 
 // ========== Utility Functions ==========
 
@@ -838,8 +840,16 @@ static inline void* c_bytemap_entry_value(const bytemap_entry* entry) {
  * No NULL or occupancy checks — caller must ensure the entry is valid.
  * Intended for tight inner loops where safety is guaranteed by context.
  */
-static inline void* c_bytemap_entry_value_raw(const bytemap_entry* entry) {
+static inline void* c_bytemap_entry_value_as_ptr(const bytemap_entry* entry) {
     return *(void**) entry->value;
+}
+
+static inline uintptr_t c_bytemap_entry_value_as_uintptr(const bytemap_entry* entry) {
+    return (uintptr_t) *(void**) entry->value;
+}
+
+static inline double c_bytemap_entry_value_as_double(const bytemap_entry* entry) {
+    return *(double*) entry->value;
 }
 
 #endif  // C_CBASE_BYTEMAP_H

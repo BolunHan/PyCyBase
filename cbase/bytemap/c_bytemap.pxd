@@ -133,7 +133,9 @@ cdef extern from "cbase/bytemap/c_bytemap.h":
     bytemap_entry* c_bytemap_next(const bytemap_entry* entry) noexcept nogil
     bytemap_entry* c_bytemap_prev(const bytemap_entry* entry) noexcept nogil
     void* c_bytemap_entry_value(const bytemap_entry* entry) noexcept nogil
-    void* c_bytemap_entry_value_raw(const bytemap_entry* entry) noexcept nogil
+    void* c_bytemap_entry_value_as_ptr(const bytemap_entry* entry) noexcept nogil
+    uintptr_t c_bytemap_entry_value_as_uintptr(const bytemap_entry* entry) noexcept nogil
+    double c_bytemap_entry_value_as_double(const bytemap_entry* entry) noexcept nogil
 
 
 cdef object NO_DEFAULT

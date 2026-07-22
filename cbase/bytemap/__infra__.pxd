@@ -28,7 +28,9 @@ from .c_bytemap cimport (
     c_bytemap_set, c_bytemap_pop, c_bytemap_len, c_bytemap_clone,
 
     c_bytemap_first, c_bytemap_last, c_bytemap_next, c_bytemap_prev,
-    c_bytemap_entry_value, c_bytemap_entry_value_raw,
+    c_bytemap_entry_value,
+    c_bytemap_entry_value_as_ptr, c_bytemap_entry_value_as_uintptr,
+    c_bytemap_entry_value_as_double,
 
     _ByteMapBase,
     ByteMapEx, ByteMapExDouble, ByteMap,
