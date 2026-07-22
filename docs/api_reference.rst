@@ -14,7 +14,28 @@ usage, see the module-specific pages.
    - :doc:`bytemap` — Fast hash maps
    - :doc:`intern_string` — String interning
    - :doc:`env_config` — EnvConfigContext base class
+   - :doc:`backports` — Python C API backports (128-bit int, dict)
    - :doc:`c_api` — C-level API for extension developers
+
+Backports
+---------
+
+.. automodule:: cbase.backports
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: cbase.backports.pylong
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :no-index:
+
+.. automodule:: cbase.backports.pydict
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :no-index:
 
 Top-Level Package
 -----------------

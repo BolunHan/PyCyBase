@@ -136,6 +136,8 @@ setup(ext_modules=cythonize([ext]))
 | `cbase.allocator_protocol.c_shm_allocator` | POSIX shared-memory page allocator |
 | `cbase.bytemap.c_bytemap` | xxHash3-backed hash maps |
 | `cbase.intern_string.c_intern_string` | FNV-1a-hashed string interning |
+| `cbase.backports.pylong` | Python int ↔ 128-bit integer (uint128_t/int128_t) backport |
+| `cbase.backports.pydict` | PyDict_Pop backport for pre-3.13 Python |
 
 ## Documentation
 
