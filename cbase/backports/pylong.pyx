@@ -1,5 +1,8 @@
 from cpython.bytes cimport PyBytes_FromStringAndSize
 
+from cbase.int128 cimport c_read_uint128, c_write_uint128, c_read_int128, c_write_int128
+
+
 globals()['_UINT128_MAX'] = _UINT128_MAX = (1 << 128) - 1
 globals()['_INT128_MAX'] = _INT128_MAX = (1 << 127) - 1
 globals()['_INT128_MIN'] = _INT128_MIN = -(1 << 127)
