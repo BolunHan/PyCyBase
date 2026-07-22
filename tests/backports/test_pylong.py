@@ -9,20 +9,15 @@ byte order and signedness flags.
 """
 import unittest
 
-from cbase.backports.pylong import (
-    pylong_as_int128,
-    pylong_as_uint128,
-    pylong_from_int128,
-    pylong_from_uint128,
-)
+from cbase.backports.pylong import _INT128_MAX, _INT128_MIN, _UINT128_MAX, pylong_as_int128, pylong_as_uint128, pylong_from_int128, pylong_from_uint128
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-UINT128_MAX = (1 << 128) - 1
-INT128_MAX = (1 << 127) - 1
-INT128_MIN = -(1 << 127)
+UINT128_MAX = _UINT128_MAX
+INT128_MAX = _INT128_MAX
+INT128_MIN = _INT128_MIN
 
 
 # ---------------------------------------------------------------------------
@@ -219,12 +214,12 @@ class TestAgainstStdlibOracle(unittest.TestCase):
     def test_03_int128_from_matches_oracle(self) -> None:
         """pylong_from_int128 matches int.from_bytes(data, 'little', signed=True)."""
         data_values = [
-            b'\x00' * 16,                     # 0
-            b'\x01' + b'\x00' * 15,           # 1
-            b'\xff' * 16,                     # -1
-            b'\xff' * 15 + b'\x7f',           # INT128_MAX
-            b'\x00' * 15 + b'\x80',           # INT128_MIN
-            bytes(range(16)),                 # arbitrary pattern
+            b'\x00' * 16,  # 0
+            b'\x01' + b'\x00' * 15,  # 1
+            b'\xff' * 16,  # -1
+            b'\xff' * 15 + b'\x7f',  # INT128_MAX
+            b'\x00' * 15 + b'\x80',  # INT128_MIN
+            bytes(range(16)),  # arbitrary pattern
         ]
         for data in data_values:
             with self.subTest(data=data.hex()):
@@ -258,7 +253,7 @@ class TestOverflowErrors(unittest.TestCase):
     def test_02_huge_uint128_raises(self) -> None:
         """Very large values raise OverflowError."""
         with self.assertRaises(OverflowError):
-            pylong_as_uint128(2**256)
+            pylong_as_uint128(2 ** 256)
 
     def test_03_int128_positive_overflow_raises(self) -> None:
         """Values > INT128_MAX raise OverflowError for int128_t."""
