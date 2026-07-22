@@ -49,10 +49,7 @@ cdef extern from "cbase/bytemap/c_bytemap.h":
         BYTEMAP_CALLBACK_EVENT_REHASH
         BYTEMAP_CALLBACK_EVENT_FREED
 
-    ctypedef void (*bytemap_callback_func)(bytemap_callback_event event,
-                                            const char* key, size_t key_len,
-                                            const char* value, size_t value_len,
-                                            uint64_t seq_id, void* user_data) noexcept
+    ctypedef void (*bytemap_callback_func)(bytemap_callback_event event, const char* key, size_t key_len, const char* value, size_t value_len, uint64_t seq_id, void* user_data) noexcept
 
     ctypedef bytemap_callback_func bytemap_ex_callback_func
 
@@ -136,6 +133,7 @@ cdef extern from "cbase/bytemap/c_bytemap.h":
     bytemap_entry* c_bytemap_next(const bytemap_entry* entry) noexcept nogil
     bytemap_entry* c_bytemap_prev(const bytemap_entry* entry) noexcept nogil
     void* c_bytemap_entry_value(const bytemap_entry* entry) noexcept nogil
+    void* c_bytemap_entry_value_raw(const bytemap_entry* entry) noexcept nogil
 
 
 cdef object NO_DEFAULT
@@ -238,10 +236,7 @@ cdef class _BoundByteMapBase(dict):
     cdef uintptr_t callback_id
 
     @staticmethod
-    cdef void c_sync(bytemap_callback_event event,
-                      const char* key, size_t key_len,
-                      const char* value, size_t value_len,
-                      uint64_t seq_id, void* user_data) noexcept
+    cdef void c_sync(bytemap_callback_event event, const char* key, size_t key_len, const char* value, size_t value_len, uint64_t seq_id, void* user_data) noexcept
 
     cdef void _init_bound_header(self, size_t slot_capacity)
 
@@ -313,10 +308,7 @@ cdef class BoundByteSet(set):
     cdef BoundByteSet c_from_header(bytemap* header, bint owner=?)
 
     @staticmethod
-    cdef void c_sync(bytemap_callback_event event,
-                      const char* key, size_t key_len,
-                      const char* value, size_t value_len,
-                      uint64_t seq_id, void* user_data) noexcept
+    cdef void c_sync(bytemap_callback_event event, const char* key, size_t key_len, const char* value, size_t value_len, uint64_t seq_id, void* user_data) noexcept
 
     cdef void c_bind(self, bytemap* header)
 

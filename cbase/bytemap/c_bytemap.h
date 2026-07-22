@@ -189,6 +189,7 @@ static inline bytemap_entry* c_bytemap_last(const bytemap* map);
 static inline bytemap_entry* c_bytemap_next(const bytemap_entry* entry);
 static inline bytemap_entry* c_bytemap_prev(const bytemap_entry* entry);
 static inline void*          c_bytemap_entry_value(const bytemap_entry* entry);
+static inline void*          c_bytemap_entry_value_raw(const bytemap_entry* entry);
 
 // ========== Utility Functions ==========
 
@@ -828,6 +829,16 @@ static inline bytemap_entry* c_bytemap_prev(const bytemap_entry* entry) {
  */
 static inline void* c_bytemap_entry_value(const bytemap_entry* entry) {
     if (!entry || !entry->occupied) return NULL;
+    return *(void**) entry->value;
+}
+
+/**
+ * @brief Raw unchecked extraction of void* value from an entry.
+ *
+ * No NULL or occupancy checks — caller must ensure the entry is valid.
+ * Intended for tight inner loops where safety is guaranteed by context.
+ */
+static inline void* c_bytemap_entry_value_raw(const bytemap_entry* entry) {
     return *(void**) entry->value;
 }
 
