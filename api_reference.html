@@ -198,6 +198,7 @@
 <li class="toctree-l1"><a class="reference internal" href="shm_allocator.html">Shared-Memory Allocator</a></li>
 <li class="toctree-l1"><a class="reference internal" href="bytemap.html">ByteMap</a></li>
 <li class="toctree-l1"><a class="reference internal" href="intern_string.html">Intern String</a></li>
+<li class="toctree-l1"><a class="reference internal" href="backports.html">Backports</a></li>
 <li class="toctree-l1"><a class="reference internal" href="env_config.html">Environment Config Context</a></li>
 <li class="toctree-l1"><a class="reference internal" href="c_api.html">C API Reference</a></li>
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">API Reference</a></li>
@@ -254,9 +255,33 @@ usage, see the module-specific pages.</p>
 <li><p><a class="reference internal" href="bytemap.html"><span class="doc">ByteMap</span></a> — Fast hash maps</p></li>
 <li><p><a class="reference internal" href="intern_string.html"><span class="doc">Intern String</span></a> — String interning</p></li>
 <li><p><a class="reference internal" href="env_config.html"><span class="doc">Environment Config Context</span></a> — EnvConfigContext base class</p></li>
+<li><p><a class="reference internal" href="backports.html"><span class="doc">Backports</span></a> — Python C API backports (128-bit int, dict)</p></li>
 <li><p><a class="reference internal" href="c_api.html"><span class="doc">C API Reference</span></a> — C-level API for extension developers</p></li>
 </ul>
 </div>
+<section id="module-cbase.backports">
+<span id="backports"></span><h2>Backports<a class="headerlink" href="#module-cbase.backports" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">cbase.backports.pylong.</span></span><span class="sig-name descname"><span class="pre">pylong_as_int128</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">val</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#bytes" title="(in Python v3.14)"><span class="pre">bytes</span></a></span></span></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">cbase.backports.pylong.</span></span><span class="sig-name descname"><span class="pre">pylong_as_uint128</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">val</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#bytes" title="(in Python v3.14)"><span class="pre">bytes</span></a></span></span></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">cbase.backports.pylong.</span></span><span class="sig-name descname"><span class="pre">pylong_from_int128</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bytes</span> <span class="pre">buf</span></span></em><span class="sig-paren">)</span></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">cbase.backports.pylong.</span></span><span class="sig-name descname"><span class="pre">pylong_from_uint128</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bytes</span> <span class="pre">buf</span></span></em><span class="sig-paren">)</span></dt>
+<dd></dd></dl>
+
+</section>
 <section id="module-cbase">
 <span id="top-level-package"></span><h2>Top-Level Package<a class="headerlink" href="#module-cbase" title="Link to this heading">¶</a></h2>
 <dl class="py function">
@@ -381,6 +406,7 @@ mypy or pyright.</p>
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">API Reference</a><ul>
+<li><a class="reference internal" href="#module-cbase.backports">Backports</a></li>
 <li><a class="reference internal" href="#module-cbase">Top-Level Package</a><ul>
 <li><a class="reference internal" href="#cbase.get_include"><code class="docutils literal notranslate"><span class="pre">get_include()</span></code></a></li>
 </ul>

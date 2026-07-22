@@ -19,6 +19,7 @@ heap, shared-memory, and raw-``malloc`` backends.
    shm_allocator
    bytemap
    intern_string
+   backports
    env_config
    c_api
    api_reference
