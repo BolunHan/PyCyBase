@@ -1,5 +1,35 @@
-/cbase/allocator_protocol/__init__.pxd
-/cbase/bytemap/__init__.pxd
-/cbase/intern_string/__init__.pxd
-/cbase/__init__.pxd
-/cbase/backports/__init__.pxd
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+*.egg
+
+# Cython __init__.pxd
+**/__init__.pxd
+
+# Cython-generated C files
+cbase/**/*.c
+
+# Build
+build/
+docs/_build
+
+# Includes
+cbase/includes/
+
+# IDE
+.idea/
+.vscode/
+
+# Test Artifacts
+test/*/artifacts/
+
+# Macro Probing Cache
+macros.json
+
+# Backup files
+*.bkp
+*.bak
