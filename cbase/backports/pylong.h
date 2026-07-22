@@ -1,5 +1,5 @@
-#ifndef PYLONG_COMP_H
-#define PYLONG_COMP_H
+#ifndef PY_BACKPORTS_LONG_H
+#define PY_BACKPORTS_LONG_H
 
 #include <Python.h>
 #include <stdint.h>
@@ -151,4 +151,4 @@ static inline Py_ssize_t PyLong_AsInt128(PyObject* obj, int128_t* value) {
 #endif
 }
 
-#endif /* PYLONG_COMP_H */
+#endif  // PY_BACKPORTS_LONG_H
