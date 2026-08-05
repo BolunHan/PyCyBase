@@ -190,6 +190,12 @@ cython_extension.extend([
         include_dirs=[REPO_ROOT]
     ),
     Extension(
+        name="cbase.config_view",
+        sources=["cbase/config_view.pyx"],
+        extra_compile_args=COMPILE_FLAGS,
+        include_dirs=[REPO_ROOT]
+    ),
+    Extension(
         name="cbase.allocator_protocol.c_shm_comp",
         sources=["cbase/allocator_protocol/c_shm_comp.pyx"],
         extra_compile_args=COMPILE_FLAGS,
