@@ -4,6 +4,8 @@ import functools
 import os
 import pathlib
 
+from .config_view import CONFIG_VIEW
+
 
 @functools.cache
 def get_include() -> list[str]:
@@ -25,4 +27,5 @@ def get_include() -> list[str]:
 
 __all__ = [
     'get_include',
+    'CONFIG_VIEW',
 ]
