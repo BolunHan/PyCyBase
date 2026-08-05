@@ -204,6 +204,8 @@ class TestShmRequest(_FreshAllocatorMixin, unittest.TestCase):
         self.assertEqual(bytes(b2.buffer[:4]), b'\x00' * 4)
 
     def test_request_lifo_free_list(self):
+        """Bins are LIFO; request returns the most recently freed block
+        of the matching capacity."""
         b1 = self.allocator.calloc(32)
         b2 = self.allocator.calloc(64)
         addr1, addr2 = b1.address, b2.address
@@ -211,8 +213,8 @@ class TestShmRequest(_FreshAllocatorMixin, unittest.TestCase):
         self.allocator.free(b2)
         self.allocator.free(b1)
 
-        b3 = self.allocator.request(16)
-        b4 = self.allocator.request(48)
+        b3 = self.allocator.request(32)
+        b4 = self.allocator.request(64)
         self.assertEqual(b3.address, addr1)
         self.assertEqual(b4.address, addr2)
 

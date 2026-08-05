@@ -129,7 +129,7 @@ class TestAllocatorProtocolWithFreelist(unittest.TestCase):
             a1.buf[:8] = b'\xff' * 8
             addr_1 = a1.addr
             del a1
-            a2 = AllocatorProtocol(256)
+            a2 = AllocatorProtocol(512)
             self.assertEqual(a2.addr, addr_1)
             self.assertEqual(bytes(a2.buf[:8]), b'\x00' * 8)
 

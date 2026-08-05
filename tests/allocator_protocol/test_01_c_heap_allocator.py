@@ -196,14 +196,15 @@ class TestRequest(_FreshAllocatorMixin, unittest.TestCase):
         b2 = self.allocator.request(128)
         self.assertEqual(b2.address, addr1)
 
-    def test_reuses_freed_block_smaller_request(self):
+    def test_reuses_freed_block_same_size(self):
+        """Exact bins: only same-capacity blocks are reused (O(1) hit)."""
         b1 = self.allocator.calloc(256)
         addr1 = b1.address
         self.allocator.free(b1)
 
-        b2 = self.allocator.request(64)
+        b2 = self.allocator.request(256)
         self.assertEqual(b2.address, addr1)
-        self.assertEqual(b2.size, 64)
+        self.assertEqual(b2.size, 256)
 
     def test_zeroed_after_reuse(self):
         b1 = self.allocator.calloc(64)
@@ -214,7 +215,8 @@ class TestRequest(_FreshAllocatorMixin, unittest.TestCase):
         self.assertEqual(bytes(b2.buffer[:4]), b'\x00' * 4)
 
     def test_lifo_free_list_order(self):
-        """Free list is LIFO; request returns most recently freed block."""
+        """Bins are LIFO; request returns the most recently freed block
+        of the matching capacity."""
         b1 = self.allocator.calloc(32)
         b2 = self.allocator.calloc(64)
         addr1, addr2 = b1.address, b2.address
@@ -222,9 +224,9 @@ class TestRequest(_FreshAllocatorMixin, unittest.TestCase):
         self.allocator.free(b2)
         self.allocator.free(b1)
 
-        b3 = self.allocator.request(16)
+        b3 = self.allocator.request(32)
         self.assertEqual(b3.address, addr1)
-        b4 = self.allocator.request(48)
+        b4 = self.allocator.request(64)
         self.assertEqual(b4.address, addr2)
 
     def test_too_large_for_free_list_extends(self):
