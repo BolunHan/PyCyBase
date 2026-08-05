@@ -7,6 +7,8 @@ cdef extern from "cbase/allocator_protocol/c_shm_comp.h":
     const size_t AP_SHM_AUTOPAGE_ALIGNMENT
     const char*  AP_SHM_ALLOCATOR_PREFIX
     const size_t AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE
+    const size_t AP_SHM_NAME_LEN
+    const size_t AP_SHM_PREFIX_MAX
     const size_t AP_SHM_EXACT_BIN_COUNT
     const size_t AP_SHM_LARGE_BIN_COUNT
     const size_t AP_SHM_BIN_COUNT

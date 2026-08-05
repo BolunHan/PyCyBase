@@ -10,6 +10,8 @@ from .c_shm_comp cimport shm_allocator as shm_allocator_t, shm_allocator_ctx as 
 cdef extern from "cbase/allocator_protocol/c_allocator_protocol.h":
     const uint8_t AP_ALLOC_VIGILANT
     const uint64_t AP_ALLOC_MAGIC
+    const uint64_t AP_DEALLOC_MAGIC
+    const uint8_t AP_DECREF_AUTOFREE
     const c_bool AP_ALLOC_WITH_LOCK
     const c_bool AP_ALLOC_WITH_SHM
     const c_bool AP_ALLOC_WITH_FREELIST
