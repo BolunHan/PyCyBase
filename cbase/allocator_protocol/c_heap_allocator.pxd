@@ -3,6 +3,12 @@ cdef extern from "cbase/allocator_protocol/c_heap_allocator.h":
     const size_t AP_HEAP_AUTOPAGE_CAPACITY
     const size_t AP_HEAP_AUTOPAGE_CAPACITY_MAX
     const size_t AP_HEAP_AUTOPAGE_ALIGNMENT
+    const size_t AP_HEAP_EXACT_BIN_COUNT
+    const size_t AP_HEAP_LARGE_BIN_COUNT
+    const size_t AP_HEAP_BIN_COUNT
+    const size_t AP_HEAP_PAGE_EXTEND_MAX
+    const size_t AP_HEAP_PAGE_FIT_TO_REQUEST
+    const size_t AP_HEAP_EXACT_BIN_PROBE_COUNT
 
     ctypedef struct pthread_mutex_t:
         pass
@@ -26,11 +32,11 @@ cdef extern from "cbase/allocator_protocol/c_heap_allocator.h":
     ctypedef struct heap_allocator:
         pthread_mutex_t lock
         size_t mapped_pages
-        heap_memory_block* free_list
         heap_page* active_page
         size_t autopage_capacity
         size_t autopage_capacity_max
         size_t autopage_alignment
+        heap_memory_block* bins[AP_HEAP_BIN_COUNT]
 
     int pthread_mutex_init(pthread_mutex_t* mutex, void* attr) noexcept nogil
     int pthread_mutex_lock(pthread_mutex_t* mutex) noexcept nogil
@@ -39,6 +45,8 @@ cdef extern from "cbase/allocator_protocol/c_heap_allocator.h":
 
     size_t c_heap_page_roundup(heap_allocator* allocator, size_t size) noexcept nogil
     size_t c_heap_block_roundup(size_t size) noexcept nogil
+    size_t c_heap_block_ceil_log2(unsigned int v) noexcept nogil
+    size_t c_heap_block_bin(size_t capacity) noexcept nogil
     void c_heap_page_reclaim(heap_allocator* allocator, heap_page* page) noexcept nogil
 
     heap_page* c_heap_allocator_extend(heap_allocator* allocator, size_t capacity, pthread_mutex_t* lock) noexcept nogil

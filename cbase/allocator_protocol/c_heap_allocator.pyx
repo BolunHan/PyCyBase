@@ -237,10 +237,13 @@ cdef class HeapAllocator:
     def free_list(self):
         if not self.allocator:
             raise RuntimeError(f'Uninitialized <{self.__class__.__name__}>')
-        cdef heap_memory_block* block = self.allocator.free_list
-        while block:
-            yield HeapMemoryBlock.c_from_header(block, False)
-            block = block.next_free
+        cdef heap_memory_block* block
+        cdef size_t bin
+        for bin in range(AP_HEAP_BIN_COUNT):
+            block = self.allocator.bins[bin]
+            while block:
+                yield HeapMemoryBlock.c_from_header(block, False)
+                block = block.next_free
 
     property mapped_pages:
         def __get__(self):

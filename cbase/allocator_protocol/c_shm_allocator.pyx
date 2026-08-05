@@ -323,10 +323,13 @@ cdef class SharedMemoryAllocator:
     def free_list(self):
         if not self.ctx:
             raise RuntimeError(f'Uninitialized <{self.__class__.__name__}>')
-        cdef shm_memory_block* block = self.ctx.shm_allocator.free_list
-        while block:
-            yield SharedMemoryBlock.c_from_header(block, False)
-            block = block.next_free
+        cdef shm_memory_block* block
+        cdef size_t bin
+        for bin in range(AP_SHM_BIN_COUNT):
+            block = self.ctx.shm_allocator.bins[bin]
+            while block:
+                yield SharedMemoryBlock.c_from_header(block, False)
+                block = block.next_free
 
     property name:
         def __get__(self) -> str:

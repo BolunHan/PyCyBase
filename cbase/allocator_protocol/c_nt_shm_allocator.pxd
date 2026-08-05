@@ -7,6 +7,12 @@ cdef extern from "cbase/allocator_protocol/c_nt_shm_allocator.h":
     const size_t AP_SHM_NAME_LEN
     const size_t AP_SHM_PREFIX_MAX
     const size_t AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE
+    const size_t AP_SHM_EXACT_BIN_COUNT
+    const size_t AP_SHM_LARGE_BIN_COUNT
+    const size_t AP_SHM_BIN_COUNT
+    const size_t AP_SHM_PAGE_EXTEND_MAX
+    const size_t AP_SHM_PAGE_FIT_TO_REQUEST
+    const size_t AP_SHM_EXACT_BIN_PROBE_COUNT
     const size_t c_nt_shm_page_overhead
     const size_t c_nt_shm_block_overhead
 
@@ -45,10 +51,10 @@ cdef extern from "cbase/allocator_protocol/c_nt_shm_allocator.h":
         size_t mapped_size
         char active_page[AP_SHM_NAME_LEN]
         size_t mapped_pages
-        nt_shm_memory_block* free_list
         size_t autopage_capacity
         size_t autopage_capacity_max
         size_t autopage_alignment
+        nt_shm_memory_block* bins[AP_SHM_BIN_COUNT]
         char shm_prefix[AP_SHM_PREFIX_MAX]
         pthread_mutex_t lock
 
@@ -65,6 +71,8 @@ cdef extern from "cbase/allocator_protocol/c_nt_shm_allocator.h":
 
     size_t c_nt_shm_page_roundup(nt_shm_allocator* allocator, size_t size)
     size_t c_nt_shm_block_roundup(size_t size)
+    size_t c_nt_shm_block_ceil_log2(unsigned int v)
+    size_t c_nt_shm_block_bin(size_t capacity)
     void c_nt_shm_allocator_name(const char* shm_prefix, char* out)
     void c_nt_shm_page_name(nt_shm_allocator* allocator, char* out)
     void c_nt_shm_mutex_name(const char* shm_prefix, char* out)

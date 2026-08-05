@@ -20,6 +20,12 @@ cdef extern from "cbase/allocator_protocol/c_shm_allocator.h":
     const size_t AP_SHM_NAME_LEN
     const size_t AP_SHM_PREFIX_MAX
     const size_t AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE
+    const size_t AP_SHM_EXACT_BIN_COUNT
+    const size_t AP_SHM_LARGE_BIN_COUNT
+    const size_t AP_SHM_BIN_COUNT
+    const size_t AP_SHM_PAGE_EXTEND_MAX
+    const size_t AP_SHM_PAGE_FIT_TO_REQUEST
+    const size_t AP_SHM_EXACT_BIN_PROBE_COUNT
     const size_t c_shm_page_overhead
     const size_t c_shm_block_overhead
 
@@ -55,10 +61,10 @@ cdef extern from "cbase/allocator_protocol/c_shm_allocator.h":
         size_t mapped_size
         char active_page[AP_SHM_NAME_LEN]
         size_t mapped_pages
-        shm_memory_block* free_list
         size_t autopage_capacity
         size_t autopage_capacity_max
         size_t autopage_alignment
+        shm_memory_block* bins[AP_SHM_BIN_COUNT]
         char shm_prefix[AP_SHM_PREFIX_MAX]
 
     ctypedef struct shm_allocator_ctx:
@@ -68,6 +74,8 @@ cdef extern from "cbase/allocator_protocol/c_shm_allocator.h":
 
     size_t c_shm_page_roundup(shm_allocator* allocator, size_t size) noexcept nogil
     size_t c_shm_block_roundup(size_t size) noexcept nogil
+    size_t c_shm_block_ceil_log2(unsigned int v) noexcept nogil
+    size_t c_shm_block_bin(size_t capacity) noexcept nogil
     void c_shm_allocator_name(const void* region, const char* shm_prefix, char* out) noexcept nogil
     void c_shm_page_name(shm_allocator* allocator, char* out) noexcept nogil
     int c_shm_scan(const char* prefix, char* out) noexcept nogil
