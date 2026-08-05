@@ -1,4 +1,4 @@
-from libc.stdint cimport uint64_t
+from libc.stdint cimport uint64_t, uint8_t
 
 from cbase.allocator_protocol.c_allocator_protocol cimport allocator_protocol
 
@@ -6,6 +6,9 @@ from cbase.allocator_protocol.c_allocator_protocol cimport allocator_protocol
 cdef extern from "cbase/intern_string/c_intern_string.h":
     # === Constants ===
     size_t ISTR_INITIAL_CAPACITY
+    uint64_t FNV_OFFSET_BASIS
+    uint64_t FNV_PRIME
+    uint8_t ISTR_USE_BYTEMAP_BACKEND
 
     ctypedef struct pthread_mutex_t:
         pass

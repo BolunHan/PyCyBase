@@ -1,4 +1,6 @@
 from .c_intern_string cimport (
+    ISTR_INITIAL_CAPACITY, FNV_OFFSET_BASIS, FNV_PRIME, ISTR_USE_BYTEMAP_BACKEND,
+
     InternString,
     InternStringPool,
     C_POOL, POOL,
