@@ -71,6 +71,7 @@ c_heap_allocator.h
        heap_page*    active_page;
        heap_page*    pages;
        heap_block*   free_list;
+       heap_block*   bins[AP_HEAP_BIN_COUNT];  // size-binned free lists (v0.1.9)
        size_t        mapped_pages;
        size_t        autopage_capacity;
        size_t        autopage_capacity_max;
@@ -104,6 +105,14 @@ Key functions:
 - ``heap_block* c_heap_request(heap_allocator*, size_t, bool, bool)`` — Request block
 - ``void c_heap_free(heap_allocator*, heap_block*, bool)`` — Return to free list
 - ``void c_heap_reclaim(heap_allocator*, bool)`` — Coalesce free list
+- ``size_t c_heap_block_ceil_log2(uint32_t)`` — ceil(log2(v)) for bin indexing (v0.1.9)
+- ``size_t c_heap_block_bin(size_t)`` — Bin index for a block capacity (v0.1.9)
+
+Compile-time macros (all overridable via ``-D`` at build time):
+
+- ``AP_HEAP_AUTOPAGE_CAPACITY``, ``AP_HEAP_AUTOPAGE_CAPACITY_MAX``, ``AP_HEAP_AUTOPAGE_ALIGNMENT`` — page sizing
+- ``AP_HEAP_EXACT_BIN_COUNT`` (8192), ``AP_HEAP_LARGE_BIN_COUNT`` (9), ``AP_HEAP_BIN_COUNT`` (8202) — bin dimensions
+- ``AP_HEAP_PAGE_EXTEND_MAX`` (128 MiB), ``AP_HEAP_PAGE_FIT_TO_REQUEST`` (0), ``AP_HEAP_EXACT_BIN_PROBE_COUNT`` (2) — miss-path policy
 
 c_shm_allocator.h
 ~~~~~~~~~~~~~~~~~
@@ -123,6 +132,7 @@ c_shm_allocator.h
        shm_page*       pages;
        shm_page*       active_page;
        shm_block*      free_list;
+       shm_block*      bins[AP_SHM_BIN_COUNT];  // size-binned free lists (v0.1.9)
        size_t          mapped_pages;
        pid_t           pid;
        char            shm_name[AP_SHM_NAME_LEN];
@@ -140,6 +150,15 @@ Key functions:
 - ``shm_block* c_shm_request(shm_allocator_ctx*, size_t, bool, bool)`` — Request
 - ``void c_shm_free(shm_allocator_ctx*, shm_block*, bool)`` — Free
 - ``void c_shm_reclaim(shm_allocator_ctx*, bool)`` — Coalesce
+- ``size_t c_shm_block_ceil_log2(uint32_t)`` — ceil(log2(v)) for bin indexing (v0.1.9)
+- ``size_t c_shm_block_bin(size_t)`` — Bin index for a block capacity (v0.1.9)
+
+Compile-time macros (all overridable via ``-D`` at build time):
+
+- ``AP_SHM_AUTOPAGE_CAPACITY``, ``AP_SHM_AUTOPAGE_CAPACITY_MAX``, ``AP_SHM_AUTOPAGE_ALIGNMENT`` — page sizing
+- ``AP_SHM_ALLOCATOR_PREFIX``, ``AP_SHM_NAME_LEN``, ``AP_SHM_PREFIX_MAX``, ``AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE`` — SHM config
+- ``AP_SHM_EXACT_BIN_COUNT`` (8192), ``AP_SHM_LARGE_BIN_COUNT`` (9), ``AP_SHM_BIN_COUNT`` (8202) — bin dimensions
+- ``AP_SHM_PAGE_EXTEND_MAX`` (128 MiB), ``AP_SHM_PAGE_FIT_TO_REQUEST`` (0), ``AP_SHM_EXACT_BIN_PROBE_COUNT`` (2) — miss-path policy
 
 c_bytemap.h
 ~~~~~~~~~~~
