@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Shared-Memory Allocator" href="shm_allocator.html"><link rel="prev" title="Allocator Protocol" href="allocator_protocol.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>Heap Allocator - PyCyBase v0.1.9</title>
+        <title>Heap Allocator - PyCyBase v0.1.10</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">PyCyBase v0.1.9</div></a>
+      <a href="index.html"><div class="brand">PyCyBase v0.1.10</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -182,7 +182,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">PyCyBase v0.1.9</span>
+  <span class="sidebar-brand-text">PyCyBase v0.1.10</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -607,10 +607,29 @@ as the global heap backend for the allocator protocol.</p>
 </section>
 <section id="compile-time-constants">
 <h2>Compile-Time Constants<a class="headerlink" href="#compile-time-constants" title="Link to this heading">¶</a></h2>
+<p>Auto-page sizing:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">cbase.allocator_protocol.c_heap_allocator</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">DEFAULT_AUTOPAGE_CAPACITY</span><span class="p">,</span>    <span class="c1"># 64 KiB — first/auto page size</span>
     <span class="n">MAX_AUTOPAGE_CAPACITY</span><span class="p">,</span>         <span class="c1"># 16 MiB — maximum page size</span>
     <span class="n">DEFAULT_AUTOPAGE_ALIGNMENT</span><span class="p">,</span>    <span class="c1"># 4 KiB — page alignment</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Size-binned free-list tuning (added in v0.1.9):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">cbase.allocator_protocol.c_heap_allocator</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">EXACT_BIN_COUNT</span><span class="p">,</span>              <span class="c1"># 8192 — exact 8-byte-granular bins (≤ 64 KiB)</span>
+    <span class="n">LARGE_BIN_COUNT</span><span class="p">,</span>              <span class="c1"># 9 — pow2-class bins (&gt; 64 KiB)</span>
+    <span class="n">BIN_COUNT</span><span class="p">,</span>                    <span class="c1"># 8202 — total bin count (EXACT + LARGE + 1)</span>
+    <span class="n">PAGE_EXTEND_MAX</span><span class="p">,</span>              <span class="c1"># 128 MiB — max auto-page extension</span>
+    <span class="n">PAGE_FIT_TO_REQUEST</span><span class="p">,</span>          <span class="c1"># 0 — when 1, page fits request instead of pow2 scaling</span>
+    <span class="n">EXACT_BIN_PROBE_COUNT</span><span class="p">,</span>        <span class="c1"># 2 — exact bins to probe on miss before page path</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Bin-computation helpers (static inline C functions exposed to Cython):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">cbase.allocator_protocol.c_heap_allocator</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">c_heap_block_ceil_log2</span><span class="p">,</span>       <span class="c1"># ceil(log2(v)) for bin indexing</span>
+    <span class="n">c_heap_block_bin</span><span class="p">,</span>             <span class="c1"># bin index for a given block capacity</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -773,7 +792,7 @@ allocator is used from a single thread.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=bb01e3b6"></script>
+</div><script src="_static/documentation_options.js?v=c1d996e2"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

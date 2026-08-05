@@ -28,6 +28,8 @@ The allocator:
 Compile-Time Constants
 ----------------------
 
+Auto-page and SHM configuration:
+
 .. code-block:: python
 
    from cbase.allocator_protocol.c_shm_allocator import (
@@ -38,6 +40,19 @@ Compile-Time Constants
        AP_SHM_NAME_LEN,                      # 256 — max SHM name length
        AP_SHM_PREFIX_MAX,                    # 64 — max custom prefix length
        AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE, # 128 GiB — default region size
+   )
+
+Size-binned free-list tuning (added in v0.1.9):
+
+.. code-block:: python
+
+   from cbase.allocator_protocol.c_shm_allocator import (
+       AP_SHM_EXACT_BIN_COUNT,              # 8192 — exact 8-byte-granular bins (≤ 64 KiB)
+       AP_SHM_LARGE_BIN_COUNT,              # 9 — pow2-class bins (> 64 KiB)
+       AP_SHM_BIN_COUNT,                    # 8202 — total bin count (EXACT + LARGE + 1)
+       AP_SHM_PAGE_EXTEND_MAX,              # 128 MiB — max auto-page extension
+       AP_SHM_PAGE_FIT_TO_REQUEST,          # 0 — when 1, page fits request instead of pow2 scaling
+       AP_SHM_EXACT_BIN_PROBE_COUNT,        # 2 — exact bins to probe on miss before page path
    )
 
 Naming Convention

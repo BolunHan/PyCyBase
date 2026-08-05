@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="API Reference" href="api_reference.html"><link rel="prev" title="Environment Config Context" href="env_config.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>C API Reference - PyCyBase v0.1.9</title>
+        <title>C API Reference - PyCyBase v0.1.10</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">PyCyBase v0.1.9</div></a>
+      <a href="index.html"><div class="brand">PyCyBase v0.1.10</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -182,7 +182,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">PyCyBase v0.1.9</span>
+  <span class="sidebar-brand-text">PyCyBase v0.1.10</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -305,6 +305,7 @@ the <code class="docutils literal notranslate"><span class="pre">.pyx</span></co
 <span class="w">    </span><span class="n">heap_page</span><span class="o">*</span><span class="w">    </span><span class="n">active_page</span><span class="p">;</span>
 <span class="w">    </span><span class="n">heap_page</span><span class="o">*</span><span class="w">    </span><span class="n">pages</span><span class="p">;</span>
 <span class="w">    </span><span class="n">heap_block</span><span class="o">*</span><span class="w">   </span><span class="n">free_list</span><span class="p">;</span>
+<span class="w">    </span><span class="n">heap_block</span><span class="o">*</span><span class="w">   </span><span class="n">bins</span><span class="p">[</span><span class="n">AP_HEAP_BIN_COUNT</span><span class="p">];</span><span class="w">  </span><span class="c1">// size-binned free lists (v0.1.9)</span>
 <span class="w">    </span><span class="kt">size_t</span><span class="w">        </span><span class="n">mapped_pages</span><span class="p">;</span>
 <span class="w">    </span><span class="kt">size_t</span><span class="w">        </span><span class="n">autopage_capacity</span><span class="p">;</span>
 <span class="w">    </span><span class="kt">size_t</span><span class="w">        </span><span class="n">autopage_capacity_max</span><span class="p">;</span>
@@ -339,6 +340,14 @@ the <code class="docutils literal notranslate"><span class="pre">.pyx</span></co
 <li><p><code class="docutils literal notranslate"><span class="pre">heap_block*</span> <span class="pre">c_heap_request(heap_allocator*,</span> <span class="pre">size_t,</span> <span class="pre">bool,</span> <span class="pre">bool)</span></code> — Request block</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">void</span> <span class="pre">c_heap_free(heap_allocator*,</span> <span class="pre">heap_block*,</span> <span class="pre">bool)</span></code> — Return to free list</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">void</span> <span class="pre">c_heap_reclaim(heap_allocator*,</span> <span class="pre">bool)</span></code> — Coalesce free list</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">size_t</span> <span class="pre">c_heap_block_ceil_log2(uint32_t)</span></code> — ceil(log2(v)) for bin indexing (v0.1.9)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">size_t</span> <span class="pre">c_heap_block_bin(size_t)</span></code> — Bin index for a block capacity (v0.1.9)</p></li>
+</ul>
+<p>Compile-time macros (all overridable via <code class="docutils literal notranslate"><span class="pre">-D</span></code> at build time):</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">AP_HEAP_AUTOPAGE_CAPACITY</span></code>, <code class="docutils literal notranslate"><span class="pre">AP_HEAP_AUTOPAGE_CAPACITY_MAX</span></code>, <code class="docutils literal notranslate"><span class="pre">AP_HEAP_AUTOPAGE_ALIGNMENT</span></code> — page sizing</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">AP_HEAP_EXACT_BIN_COUNT</span></code> (8192), <code class="docutils literal notranslate"><span class="pre">AP_HEAP_LARGE_BIN_COUNT</span></code> (9), <code class="docutils literal notranslate"><span class="pre">AP_HEAP_BIN_COUNT</span></code> (8202) — bin dimensions</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">AP_HEAP_PAGE_EXTEND_MAX</span></code> (128 MiB), <code class="docutils literal notranslate"><span class="pre">AP_HEAP_PAGE_FIT_TO_REQUEST</span></code> (0), <code class="docutils literal notranslate"><span class="pre">AP_HEAP_EXACT_BIN_PROBE_COUNT</span></code> (2) — miss-path policy</p></li>
 </ul>
 </section>
 <section id="c-shm-allocator-h">
@@ -356,6 +365,7 @@ the <code class="docutils literal notranslate"><span class="pre">.pyx</span></co
 <span class="w">    </span><span class="n">shm_page</span><span class="o">*</span><span class="w">       </span><span class="n">pages</span><span class="p">;</span>
 <span class="w">    </span><span class="n">shm_page</span><span class="o">*</span><span class="w">       </span><span class="n">active_page</span><span class="p">;</span>
 <span class="w">    </span><span class="n">shm_block</span><span class="o">*</span><span class="w">      </span><span class="n">free_list</span><span class="p">;</span>
+<span class="w">    </span><span class="n">shm_block</span><span class="o">*</span><span class="w">      </span><span class="n">bins</span><span class="p">[</span><span class="n">AP_SHM_BIN_COUNT</span><span class="p">];</span><span class="w">  </span><span class="c1">// size-binned free lists (v0.1.9)</span>
 <span class="w">    </span><span class="kt">size_t</span><span class="w">          </span><span class="n">mapped_pages</span><span class="p">;</span>
 <span class="w">    </span><span class="kt">pid_t</span><span class="w">           </span><span class="n">pid</span><span class="p">;</span>
 <span class="w">    </span><span class="kt">char</span><span class="w">            </span><span class="n">shm_name</span><span class="p">[</span><span class="n">AP_SHM_NAME_LEN</span><span class="p">];</span>
@@ -374,6 +384,15 @@ the <code class="docutils literal notranslate"><span class="pre">.pyx</span></co
 <li><p><code class="docutils literal notranslate"><span class="pre">shm_block*</span> <span class="pre">c_shm_request(shm_allocator_ctx*,</span> <span class="pre">size_t,</span> <span class="pre">bool,</span> <span class="pre">bool)</span></code> — Request</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">void</span> <span class="pre">c_shm_free(shm_allocator_ctx*,</span> <span class="pre">shm_block*,</span> <span class="pre">bool)</span></code> — Free</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">void</span> <span class="pre">c_shm_reclaim(shm_allocator_ctx*,</span> <span class="pre">bool)</span></code> — Coalesce</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">size_t</span> <span class="pre">c_shm_block_ceil_log2(uint32_t)</span></code> — ceil(log2(v)) for bin indexing (v0.1.9)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">size_t</span> <span class="pre">c_shm_block_bin(size_t)</span></code> — Bin index for a block capacity (v0.1.9)</p></li>
+</ul>
+<p>Compile-time macros (all overridable via <code class="docutils literal notranslate"><span class="pre">-D</span></code> at build time):</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">AP_SHM_AUTOPAGE_CAPACITY</span></code>, <code class="docutils literal notranslate"><span class="pre">AP_SHM_AUTOPAGE_CAPACITY_MAX</span></code>, <code class="docutils literal notranslate"><span class="pre">AP_SHM_AUTOPAGE_ALIGNMENT</span></code> — page sizing</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">AP_SHM_ALLOCATOR_PREFIX</span></code>, <code class="docutils literal notranslate"><span class="pre">AP_SHM_NAME_LEN</span></code>, <code class="docutils literal notranslate"><span class="pre">AP_SHM_PREFIX_MAX</span></code>, <code class="docutils literal notranslate"><span class="pre">AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE</span></code> — SHM config</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">AP_SHM_EXACT_BIN_COUNT</span></code> (8192), <code class="docutils literal notranslate"><span class="pre">AP_SHM_LARGE_BIN_COUNT</span></code> (9), <code class="docutils literal notranslate"><span class="pre">AP_SHM_BIN_COUNT</span></code> (8202) — bin dimensions</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">AP_SHM_PAGE_EXTEND_MAX</span></code> (128 MiB), <code class="docutils literal notranslate"><span class="pre">AP_SHM_PAGE_FIT_TO_REQUEST</span></code> (0), <code class="docutils literal notranslate"><span class="pre">AP_SHM_EXACT_BIN_PROBE_COUNT</span></code> (2) — miss-path policy</p></li>
 </ul>
 </section>
 <section id="c-bytemap-h">
@@ -593,7 +612,7 @@ directories containing the <code class="docutils literal notranslate"><span clas
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=bb01e3b6"></script>
+</div><script src="_static/documentation_options.js?v=c1d996e2"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

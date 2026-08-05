@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Backports" href="backports.html"><link rel="prev" title="ByteMap" href="bytemap.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>Intern String - PyCyBase v0.1.9</title>
+        <title>Intern String - PyCyBase v0.1.10</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">PyCyBase v0.1.9</div></a>
+      <a href="index.html"><div class="brand">PyCyBase v0.1.10</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -182,7 +182,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">PyCyBase v0.1.9</span>
+  <span class="sidebar-brand-text">PyCyBase v0.1.10</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -255,8 +255,385 @@ hashing and cached hash values for fast comparisons.</p>
 </ul>
 <p>Benchmarks show <strong>1.7–2.2× speedup</strong> over Python <code class="docutils literal notranslate"><span class="pre">str</span></code> creation with
 typical miss rates (1/1,000 to 1/1,000,000).</p>
+<dl class="py class" id="module-cbase.intern_string.c_intern_string">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.InternString">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">cbase.intern_string.c_intern_string.</span></span><span class="sig-name descname"><span class="pre">InternString</span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.InternString" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.InternString.__reduce_cython__">
+<span class="sig-name descname"><span class="pre">__reduce_cython__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#cbase.intern_string.c_intern_string.InternString.__reduce_cython__" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.InternString.__setstate_cython__">
+<span class="sig-name descname"><span class="pre">__setstate_cython__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">__pyx_state</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#cbase.intern_string.c_intern_string.InternString.__setstate_cython__" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.InternString.address">
+<span class="sig-name descname"><span class="pre">address</span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.InternString.address" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a> | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.InternString.hash_value">
+<span class="sig-name descname"><span class="pre">hash_value</span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.InternString.hash_value" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.InternString.pool">
+<span class="sig-name descname"><span class="pre">pool</span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.InternString.pool" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#cbase.intern_string.c_intern_string.InternStringPool" title="cbase.intern_string.c_intern_string.InternStringPool"><code class="xref py py-class docutils literal notranslate"><span class="pre">InternStringPool</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.InternString.string">
+<span class="sig-name descname"><span class="pre">string</span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.InternString.string" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.InternStringPool">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">cbase.intern_string.c_intern_string.</span></span><span class="sig-name descname"><span class="pre">InternStringPool</span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.InternStringPool" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.InternStringPool.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#cbase.intern_string.c_intern_string.InternStringPool.__init__" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.InternStringPool.address">
+<span class="sig-name descname"><span class="pre">address</span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.InternStringPool.address" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a> | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.InternStringPool.internalized">
+<span class="sig-name descname"><span class="pre">internalized</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#cbase.intern_string.c_intern_string.InternStringPool.internalized" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Generator" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Generator</span></code></a>[<a class="reference internal" href="#cbase.intern_string.c_intern_string.InternString" title="cbase.intern_string.c_intern_string.InternString"><code class="xref py py-class docutils literal notranslate"><span class="pre">InternString</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>]</span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.InternStringPool.istr">
+<span class="sig-name descname"><span class="pre">istr</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">str</span> <span class="pre">string</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#cbase.intern_string.c_intern_string.InternString" title="cbase.intern_string.c_intern_string.InternString"><span class="pre">InternString</span></a></span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.InternStringPool.istr" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>string</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#cbase.intern_string.c_intern_string.InternString" title="cbase.intern_string.c_intern_string.InternString"><code class="xref py py-class docutils literal notranslate"><span class="pre">InternString</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.InternStringPool.size">
+<span class="sig-name descname"><span class="pre">size</span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.InternStringPool.size" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.IstrTestToolkit">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">cbase.intern_string.c_intern_string.</span></span><span class="sig-name descname"><span class="pre">IstrTestToolkit</span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.IstrTestToolkit" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Performance benchmark toolkit for InternString vs Python str.</p>
+<p>Generates a large shared character buffer, segments it into random-length
+strings, then benchmarks C-level hash / intern / lookup / equality against
+equivalent Python str operations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>buf_size</strong> (<em>size_t</em>) – Size of the character buffer in bytes (default 2^30 ≈ 1 GiB).</p></li>
+<li><p><strong>n_seg</strong> (<em>size_t</em>) – Number of segments to generate (default 100_000).</p></li>
+<li><p><strong>max_seg_len</strong> (<em>size_t</em>) – Maximum length of each random segment in bytes (default 64).</p></li>
+<li><p><strong>n_iters</strong> (<em>size_t</em>) – Number of benchmark iterations (default 10).</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.IstrTestToolkit.buf_size">
+<span class="sig-name descname"><span class="pre">buf_size</span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.buf_size" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.IstrTestToolkit.istr_eq_routine">
+<span class="sig-name descname"><span class="pre">istr_eq_routine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">double</span></span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.istr_eq_routine" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.IstrTestToolkit.istr_hash_routine">
+<span class="sig-name descname"><span class="pre">istr_hash_routine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">double</span></span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.istr_hash_routine" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.IstrTestToolkit.istr_intern_routine">
+<span class="sig-name descname"><span class="pre">istr_intern_routine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">double</span></span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.istr_intern_routine" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.IstrTestToolkit.istr_intern_synced_routine">
+<span class="sig-name descname"><span class="pre">istr_intern_synced_routine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">double</span></span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.istr_intern_synced_routine" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.IstrTestToolkit.istr_limited_pool_routine">
+<span class="sig-name descname"><span class="pre">istr_limited_pool_routine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">double</span></span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.istr_limited_pool_routine" title="Link to this definition">¶</a></dt>
+<dd><p>Repeatedly intern from a limited pool of n_unique strings.</p>
+<p>Each iteration picks n_ops random strings (with replacement) from
+the first n_unique segments and interns them.  Since the pool is
+small relative to n_ops, most operations are hits (already-interned
+keys) — this mirrors real-world usage where a finite set of strings
+(e.g. ticker symbols) is interned repeatedly.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.IstrTestToolkit.istr_limited_pool_synced_routine">
+<span class="sig-name descname"><span class="pre">istr_limited_pool_synced_routine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">double</span></span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.istr_limited_pool_synced_routine" title="Link to this definition">¶</a></dt>
+<dd><p>Same as istr_limited_pool_routine but with c_istr_synced.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.IstrTestToolkit.istr_lookup_routine">
+<span class="sig-name descname"><span class="pre">istr_lookup_routine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">double</span></span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.istr_lookup_routine" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.IstrTestToolkit.istr_lookup_synced_routine">
+<span class="sig-name descname"><span class="pre">istr_lookup_synced_routine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">double</span></span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.istr_lookup_synced_routine" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.IstrTestToolkit.istr_miss_rate_routine">
+<span class="sig-name descname"><span class="pre">istr_miss_rate_routine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">double</span> <span class="pre">miss_rate</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">double</span></span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.istr_miss_rate_routine" title="Link to this definition">¶</a></dt>
+<dd><p>Benchmark intern with a controlled miss rate.</p>
+<p>miss_rate=0.001 → 1/1K, miss_rate=0.0001 → 1/10K, etc.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>miss_rate</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.IstrTestToolkit.max_seg_len">
+<span class="sig-name descname"><span class="pre">max_seg_len</span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.max_seg_len" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.IstrTestToolkit.n_iters">
+<span class="sig-name descname"><span class="pre">n_iters</span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.n_iters" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.IstrTestToolkit.n_ops">
+<span class="sig-name descname"><span class="pre">n_ops</span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.n_ops" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.IstrTestToolkit.n_seg">
+<span class="sig-name descname"><span class="pre">n_seg</span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.n_seg" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.IstrTestToolkit.n_unique">
+<span class="sig-name descname"><span class="pre">n_unique</span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.n_unique" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.IstrTestToolkit.pool">
+<span class="sig-name descname"><span class="pre">pool</span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.pool" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#cbase.intern_string.c_intern_string.InternStringPool" title="cbase.intern_string.c_intern_string.InternStringPool"><code class="xref py py-class docutils literal notranslate"><span class="pre">InternStringPool</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.IstrTestToolkit.py_eq_routine">
+<span class="sig-name descname"><span class="pre">py_eq_routine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">double</span></span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.py_eq_routine" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.IstrTestToolkit.py_hash_routine">
+<span class="sig-name descname"><span class="pre">py_hash_routine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">double</span></span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.py_hash_routine" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.IstrTestToolkit.py_unicode_limited_routine">
+<span class="sig-name descname"><span class="pre">py_unicode_limited_routine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">double</span></span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.py_unicode_limited_routine" title="Link to this definition">¶</a></dt>
+<dd><p>Create Python str objects from random limited-pool picks.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.IstrTestToolkit.py_unicode_miss_rate_routine">
+<span class="sig-name descname"><span class="pre">py_unicode_miss_rate_routine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">double</span> <span class="pre">miss_rate</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">double</span></span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.py_unicode_miss_rate_routine" title="Link to this definition">¶</a></dt>
+<dd><p>Python str creation with the same miss-rate pattern.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>miss_rate</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.IstrTestToolkit.py_unicode_routine">
+<span class="sig-name descname"><span class="pre">py_unicode_routine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">double</span></span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.py_unicode_routine" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.IstrTestToolkit.run_test">
+<span class="sig-name descname"><span class="pre">run_test</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><span class="pre">dict</span></a></span></span><a class="headerlink" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.run_test" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]</span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.__reduce_cython__">
+<span class="sig-prename descclassname"><span class="pre">cbase.intern_string.c_intern_string.</span></span><span class="sig-name descname"><span class="pre">__reduce_cython__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#cbase.intern_string.c_intern_string.__reduce_cython__" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="cbase.intern_string.c_intern_string.__setstate_cython__">
+<span class="sig-prename descclassname"><span class="pre">cbase.intern_string.c_intern_string.</span></span><span class="sig-name descname"><span class="pre">__setstate_cython__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">__pyx_state</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#cbase.intern_string.c_intern_string.__setstate_cython__" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
 <section id="module-singletons">
-<span id="module-cbase.intern_string.c_intern_string"></span><h2>Module Singletons<a class="headerlink" href="#module-singletons" title="Link to this heading">¶</a></h2>
+<h2>Module Singletons<a class="headerlink" href="#module-singletons" title="Link to this heading">¶</a></h2>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">cbase.intern_string</span><span class="w"> </span><span class="kn">import</span> <span class="n">POOL</span><span class="p">,</span> <span class="n">INTRA_POOL</span><span class="p">,</span> <span class="n">C_POOL</span><span class="p">,</span> <span class="n">C_INTRA_POOL</span>
 </pre></div>
 </div>
@@ -425,6 +802,50 @@ underlying C <code class="docutils literal notranslate"><span class="pre">istr_m
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">Intern String</a><ul>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.InternString"><code class="docutils literal notranslate"><span class="pre">InternString</span></code></a><ul>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.InternString.__reduce_cython__"><code class="docutils literal notranslate"><span class="pre">InternString.__reduce_cython__()</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.InternString.__setstate_cython__"><code class="docutils literal notranslate"><span class="pre">InternString.__setstate_cython__()</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.InternString.address"><code class="docutils literal notranslate"><span class="pre">InternString.address</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.InternString.hash_value"><code class="docutils literal notranslate"><span class="pre">InternString.hash_value</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.InternString.pool"><code class="docutils literal notranslate"><span class="pre">InternString.pool</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.InternString.string"><code class="docutils literal notranslate"><span class="pre">InternString.string</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.InternStringPool"><code class="docutils literal notranslate"><span class="pre">InternStringPool</span></code></a><ul>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.InternStringPool.__init__"><code class="docutils literal notranslate"><span class="pre">InternStringPool.__init__()</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.InternStringPool.address"><code class="docutils literal notranslate"><span class="pre">InternStringPool.address</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.InternStringPool.internalized"><code class="docutils literal notranslate"><span class="pre">InternStringPool.internalized()</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.InternStringPool.istr"><code class="docutils literal notranslate"><span class="pre">InternStringPool.istr()</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.InternStringPool.size"><code class="docutils literal notranslate"><span class="pre">InternStringPool.size</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.IstrTestToolkit"><code class="docutils literal notranslate"><span class="pre">IstrTestToolkit</span></code></a><ul>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.buf_size"><code class="docutils literal notranslate"><span class="pre">IstrTestToolkit.buf_size</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.istr_eq_routine"><code class="docutils literal notranslate"><span class="pre">IstrTestToolkit.istr_eq_routine()</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.istr_hash_routine"><code class="docutils literal notranslate"><span class="pre">IstrTestToolkit.istr_hash_routine()</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.istr_intern_routine"><code class="docutils literal notranslate"><span class="pre">IstrTestToolkit.istr_intern_routine()</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.istr_intern_synced_routine"><code class="docutils literal notranslate"><span class="pre">IstrTestToolkit.istr_intern_synced_routine()</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.istr_limited_pool_routine"><code class="docutils literal notranslate"><span class="pre">IstrTestToolkit.istr_limited_pool_routine()</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.istr_limited_pool_synced_routine"><code class="docutils literal notranslate"><span class="pre">IstrTestToolkit.istr_limited_pool_synced_routine()</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.istr_lookup_routine"><code class="docutils literal notranslate"><span class="pre">IstrTestToolkit.istr_lookup_routine()</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.istr_lookup_synced_routine"><code class="docutils literal notranslate"><span class="pre">IstrTestToolkit.istr_lookup_synced_routine()</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.istr_miss_rate_routine"><code class="docutils literal notranslate"><span class="pre">IstrTestToolkit.istr_miss_rate_routine()</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.max_seg_len"><code class="docutils literal notranslate"><span class="pre">IstrTestToolkit.max_seg_len</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.n_iters"><code class="docutils literal notranslate"><span class="pre">IstrTestToolkit.n_iters</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.n_ops"><code class="docutils literal notranslate"><span class="pre">IstrTestToolkit.n_ops</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.n_seg"><code class="docutils literal notranslate"><span class="pre">IstrTestToolkit.n_seg</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.n_unique"><code class="docutils literal notranslate"><span class="pre">IstrTestToolkit.n_unique</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.pool"><code class="docutils literal notranslate"><span class="pre">IstrTestToolkit.pool</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.py_eq_routine"><code class="docutils literal notranslate"><span class="pre">IstrTestToolkit.py_eq_routine()</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.py_hash_routine"><code class="docutils literal notranslate"><span class="pre">IstrTestToolkit.py_hash_routine()</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.py_unicode_limited_routine"><code class="docutils literal notranslate"><span class="pre">IstrTestToolkit.py_unicode_limited_routine()</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.py_unicode_miss_rate_routine"><code class="docutils literal notranslate"><span class="pre">IstrTestToolkit.py_unicode_miss_rate_routine()</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.py_unicode_routine"><code class="docutils literal notranslate"><span class="pre">IstrTestToolkit.py_unicode_routine()</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.IstrTestToolkit.run_test"><code class="docutils literal notranslate"><span class="pre">IstrTestToolkit.run_test()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.__reduce_cython__"><code class="docutils literal notranslate"><span class="pre">__reduce_cython__()</span></code></a></li>
+<li><a class="reference internal" href="#cbase.intern_string.c_intern_string.__setstate_cython__"><code class="docutils literal notranslate"><span class="pre">__setstate_cython__()</span></code></a></li>
 <li><a class="reference internal" href="#module-singletons">Module Singletons</a></li>
 <li><a class="reference internal" href="#usage-examples">Usage Examples</a><ul>
 <li><a class="reference internal" href="#benchmark-toolkit">Benchmark Toolkit</a></li>
@@ -442,7 +863,7 @@ underlying C <code class="docutils literal notranslate"><span class="pre">istr_m
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=bb01e3b6"></script>
+</div><script src="_static/documentation_options.js?v=c1d996e2"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
