@@ -6,9 +6,7 @@ import time
 # filter hot path never re-reads the logging module.
 cdef int _WARNING_LEVEL = 30
 
-# Singleton for the default logger name ('PyAlgoEngine'); None until the
-# first get_logger() call, exactly like the upstream module.
-LOGGER = None
+# Default log level for get_logger().
 LOG_LEVEL = logging.INFO
 
 # Per-name logger singletons: name -> logging.Logger
@@ -124,7 +122,7 @@ class DuplicateWarningFilter(logging.Filter):
         return True
 
 
-def get_logger(**kwargs) -> logging.Logger:
+def get_logger(name: str, **kwargs) -> logging.Logger:
     """Return the process-wide singleton logger for the given name.
 
     The first call with a given name creates and configures the logger
@@ -132,8 +130,7 @@ def get_logger(**kwargs) -> logging.Logger:
     it; later calls with the same name return the same instance.
 
     Args:
-        name: Logger name; each name gets its own singleton (default
-            'PyAlgoEngine', matching the upstream default).
+        name: Logger name; each name gets its own singleton.
         level: Logging level threshold for the logger and its handler.
         stream_io: Output stream for the handler; falsy disables handlers.
         formatter: Formatter attached to the created stream handler.
@@ -141,9 +138,6 @@ def get_logger(**kwargs) -> logging.Logger:
     Returns:
         The cached ``logging.Logger`` instance for ``name``.
     """
-    name = kwargs.get('name', 'PyAlgoEngine')
-    global LOGGER
-
     if name in _loggers:
         return _loggers[name]
 
@@ -175,6 +169,4 @@ def get_logger(**kwargs) -> logging.Logger:
             stream_handler.addFilter(DuplicateWarningFilter())
 
     _loggers[name] = logger
-    if name == 'PyAlgoEngine':
-        LOGGER = logger
     return logger

@@ -4,7 +4,6 @@ import logging
 import sys
 from typing import Any
 
-LOGGER: logging.Logger | None
 LOG_LEVEL: int
 
 
@@ -70,7 +69,7 @@ class DuplicateWarningFilter(logging.Filter):
         ...
 
 
-def get_logger(**kwargs: Any) -> logging.Logger:
+def get_logger(name: str, **kwargs: Any) -> logging.Logger:
     """Return the process-wide singleton logger for the given name.
 
     The first call with a given name creates and configures the logger
@@ -78,8 +77,7 @@ def get_logger(**kwargs: Any) -> logging.Logger:
     it; later calls with the same name return the same instance.
 
     Args:
-        name: Logger name; each name gets its own singleton (default
-            'PyAlgoEngine', matching the upstream default).
+        name: Logger name; each name gets its own singleton.
         level: Logging level threshold for the logger and its handler.
         stream_io: Output stream for the handler; falsy disables handlers.
         formatter: Formatter attached to the created stream handler.

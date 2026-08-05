@@ -9,7 +9,6 @@ from cbase.backports.pylong import (
 )
 
 from cbase.backports.telemetrics import (
-    LOGGER,
     LOG_LEVEL,
     ColoredFormatter,
     DuplicateWarningFilter,

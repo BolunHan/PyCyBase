@@ -14,7 +14,6 @@ import time
 import unittest
 
 from cbase.backports import ColoredFormatter, DuplicateWarningFilter, LOG_LEVEL, get_logger
-from cbase.backports import telemetrics as tm
 
 
 def _make_record(levelno: int, msg: str, args: tuple = (), name: str = 'test.telemetrics') -> logging.LogRecord:
@@ -27,27 +26,27 @@ def _make_record(levelno: int, msg: str, args: tuple = (), name: str = 'test.tel
 # ---------------------------------------------------------------------------
 
 class TestGetLogger(unittest.TestCase):
-    """Contract: get_logger() is a singleton per name and configures the
+    """Contract: get_logger(name) is a singleton per name and configures the
     logger once (level, stream handler, formatter, warning filter).
 
     Expected behavior:
+        - a name is required;
         - repeated calls with the same name return the same logger;
         - different names yield independent loggers;
         - kwargs only affect the first call for a given name.
     """
 
-    def test_00_default_singleton(self) -> None:
-        """Repeated no-arg calls return the same 'PyAlgoEngine' logger."""
-        logger_a = get_logger()
-        logger_b = get_logger()
-        self.assertIs(logger_a, logger_b)
-        self.assertEqual(logger_a.name, 'PyAlgoEngine')
+    def test_00_name_required(self) -> None:
+        """get_logger() without a name raises TypeError."""
+        with self.assertRaises(TypeError):
+            get_logger()
 
-    def test_01_per_name_singleton(self) -> None:
+    def test_01_named_singleton(self) -> None:
         """Repeated calls with the same name return the same logger."""
-        logger_a = get_logger(name='tm_per_name_singleton')
-        logger_b = get_logger(name='tm_per_name_singleton')
+        logger_a = get_logger(name='tm_named_singleton')
+        logger_b = get_logger(name='tm_named_singleton')
         self.assertIs(logger_a, logger_b)
+        self.assertEqual(logger_a.name, 'tm_named_singleton')
 
     def test_02_name_isolation(self) -> None:
         """Different names yield different logger objects."""
@@ -75,12 +74,7 @@ class TestGetLogger(unittest.TestCase):
         logger = get_logger(name='tm_formatter_kwarg', formatter=formatter)
         self.assertIs(logger.handlers[0].formatter, formatter)
 
-    def test_06_module_logger_sync(self) -> None:
-        """Module-level LOGGER tracks the default-name singleton."""
-        get_logger()
-        self.assertIs(tm.LOGGER, get_logger())
-
-    def test_07_default_level(self) -> None:
+    def test_06_default_level(self) -> None:
         """Level defaults to module LOG_LEVEL (logging.INFO)."""
         logger = get_logger(name='tm_default_level')
         self.assertEqual(logger.level, LOG_LEVEL)
