@@ -1239,7 +1239,9 @@ cdef class _BoundByteMapBase(dict):
 # ============================================================
 
 cdef class BoundByteMapEx(_BoundByteMapBase):
-    def __init__(self, size_t slot_capacity=sizeof(void*), *args, **kwargs):
+    def __init__(self, size_t slot_capacity=0, *args, **kwargs):
+        if slot_capacity == 0:
+            slot_capacity = sizeof(void*)
         self._init_bound_header(slot_capacity)
         super().__init__()
         cdef dict payload = dict(*args, **kwargs)
