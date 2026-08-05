@@ -9,6 +9,7 @@
 
 #ifdef _WIN32
 #include "cbase/nt/pthread_nt_compat.h"
+#include <intrin.h>
 #else
 #include <pthread.h>
 #endif
@@ -25,6 +26,40 @@
 
 #ifndef AP_HEAP_AUTOPAGE_ALIGNMENT
 #define AP_HEAP_AUTOPAGE_ALIGNMENT (4 * 1024) /* 4 KiB */
+#endif
+
+/* Size-binned free lists: exact 8-byte-granular bins for capacities up to
+ * AP_HEAP_EXACT_BIN_COUNT * 8 bytes, pow2-class bins above. */
+#ifndef AP_HEAP_EXACT_BIN_COUNT
+#define AP_HEAP_EXACT_BIN_COUNT 8192 /* capacity <= 64 KiB gets an exact bin */
+#endif
+
+#ifndef AP_HEAP_LARGE_BIN_COUNT
+#define AP_HEAP_LARGE_BIN_COUNT 9 /* pow2-class bins for capacity > 64 KiB */
+#endif
+
+#define AP_HEAP_BIN_COUNT (AP_HEAP_EXACT_BIN_COUNT + AP_HEAP_LARGE_BIN_COUNT + 1)
+
+/* Miss-path page scaling cap: page sizes double from the current page up
+ * to this cap; a request larger than the cap forces a bigger page.
+ * Used only when AP_HEAP_PAGE_FIT_TO_REQUEST is 0. */
+#ifndef AP_HEAP_PAGE_EXTEND_MAX
+#define AP_HEAP_PAGE_EXTEND_MAX (128 * 1024 * 1024) /* 128 MiB */
+#endif
+
+/* Miss-path page policy: 0 (default) = capped power-of-2 page scaling
+ * (see AP_HEAP_PAGE_EXTEND_MAX); 1 = fit the page to the request (floor
+ * = autopage_capacity) so rare bin misses never extend oversized pages. */
+#ifndef AP_HEAP_PAGE_FIT_TO_REQUEST
+#define AP_HEAP_PAGE_FIT_TO_REQUEST 0
+#endif
+
+/* On an exact-bin miss, probe up to this many LARGER exact bins before
+ * the page path.  A slightly larger block satisfies the request; on free
+ * it returns to its own bin (recycling unaffected), and the fragmentation
+ * is bounded by the probe range.  0 disables the probe. */
+#ifndef AP_HEAP_EXACT_BIN_PROBE_COUNT
+#define AP_HEAP_EXACT_BIN_PROBE_COUNT 2
 #endif
 
 // ========== Heap Allocator Structs ==========
@@ -50,11 +85,11 @@ typedef struct heap_page {
 typedef struct heap_allocator {
     pthread_mutex_t           lock;
     size_t                    mapped_pages;
-    struct heap_memory_block* free_list;
     struct heap_page*         active_page;
     size_t                    autopage_capacity;
     size_t                    autopage_capacity_max;
     size_t                    autopage_alignment;
+    struct heap_memory_block* bins[AP_HEAP_BIN_COUNT];
 } heap_allocator;
 
 // ========== Utility Functions ==========
@@ -65,6 +100,39 @@ static inline size_t c_heap_page_roundup(heap_allocator* allocator, size_t size)
 
 static inline size_t c_heap_block_roundup(size_t size) {
     return (size + sizeof(void*) - 1) & ~(sizeof(void*) - 1);
+}
+
+/* ceil(log2(v)) for 0 < v <= UINT32_MAX (portable; intrinsics on MSVC/GCC-Clang).
+ * 32-bit is sufficient: the bin structure caps block capacities well below
+ * 4 GiB, so a narrower parameter type truthfully advertises the domain. */
+static inline size_t c_heap_block_ceil_log2(uint32_t v) {
+    size_t floor;
+#if defined(_MSC_VER)
+    unsigned long idx = 0;
+    _BitScanReverse(&idx, (unsigned long) v);
+    floor = (size_t) idx;
+#else
+    floor = (size_t) (31u - __builtin_clz((unsigned int) v));
+#endif
+    return floor + (v != ((size_t) 1u << floor));
+}
+
+/* Size bin for a block capacity (always a multiple of 8).
+ * Exact bins: index = capacity / 8 (1..AP_HEAP_EXACT_BIN_COUNT), so any
+ * block in bin(cap_net) has capacity == cap_net and always fits.
+ * Larger capacities: pow2-class bins keyed by ceil(log2(capacity))
+ * (indices AP_HEAP_EXACT_BIN_COUNT+1..); the last bin is the overflow
+ * class.  In-bin first-fit is used there (blocks can be up to one class
+ * smaller than the request). */
+static inline size_t c_heap_block_bin(size_t capacity) {
+    if (capacity <= (size_t) AP_HEAP_EXACT_BIN_COUNT * 8u) {
+        return capacity >> 3;
+    }
+    size_t idx = (size_t) AP_HEAP_EXACT_BIN_COUNT + (c_heap_block_ceil_log2(capacity) - 16u);
+    if (idx > (size_t) AP_HEAP_EXACT_BIN_COUNT + AP_HEAP_LARGE_BIN_COUNT) {
+        idx = (size_t) AP_HEAP_EXACT_BIN_COUNT + AP_HEAP_LARGE_BIN_COUNT;
+    }
+    return idx;
 }
 
 static inline void c_heap_page_reclaim(heap_allocator* allocator, heap_page* page) {
@@ -83,7 +151,7 @@ static inline void c_heap_page_reclaim(heap_allocator* allocator, heap_page* pag
         *prevp = block->next_allocated;
         block->next_allocated = NULL;
 
-        heap_memory_block** free_prev = &allocator->free_list;
+        heap_memory_block** free_prev = &allocator->bins[c_heap_block_bin(block->capacity)];
         while (*free_prev && *free_prev != block) {
             free_prev = &(*free_prev)->next_free;
         }
@@ -167,7 +235,6 @@ static inline heap_allocator* c_heap_allocator_new() {
     }
 
     allocator->mapped_pages = 0;
-    allocator->free_list = NULL;
     allocator->active_page = NULL;
     allocator->autopage_capacity = AP_HEAP_AUTOPAGE_CAPACITY;
     allocator->autopage_capacity_max = AP_HEAP_AUTOPAGE_CAPACITY_MAX;
@@ -299,19 +366,53 @@ static inline void* c_heap_request(heap_allocator* allocator, size_t size, int s
         child_lock = NULL;
     }
 
-    heap_memory_block** prevp = &allocator->free_list;
-    heap_memory_block*  free_blk = allocator->free_list;
-    while (free_blk) {
-        if (free_blk->capacity >= cap_net) {
-            *prevp = free_blk->next_free;
+    /* Step 1: size-binned free-list reuse (see c_heap_block_bin).
+     * Exact bins always fit (capacity == cap_net) — O(1) head pop.
+     * Pow2-class bins use in-bin first-fit: bins are short and same-
+     * shaped, so the head is the common hit; larger-capacity blocks in
+     * the bin also satisfy smaller requests. */
+    size_t             bin = c_heap_block_bin(cap_net);
+    heap_memory_block* free_blk;
+    if (bin <= (size_t) AP_HEAP_EXACT_BIN_COUNT) {
+        size_t found = bin;
+        free_blk = allocator->bins[bin];
+        if (!free_blk && AP_HEAP_EXACT_BIN_PROBE_COUNT > 0) {
+            size_t probe_end = bin + (size_t) AP_HEAP_EXACT_BIN_PROBE_COUNT;
+            if (probe_end > (size_t) AP_HEAP_EXACT_BIN_COUNT) {
+                probe_end = (size_t) AP_HEAP_EXACT_BIN_COUNT;
+            }
+            for (size_t b = bin + 1; b <= probe_end; b++) {
+                free_blk = allocator->bins[b];
+                if (free_blk) {
+                    found = b;
+                    break;
+                }
+            }
+        }
+        if (free_blk) {
+            allocator->bins[found] = free_blk->next_free;
             free_blk->next_free = NULL;
             free_blk->size = size;
             if (locked) pthread_mutex_unlock(lock);
             memset(free_blk + 1, 0, cap_net);
             return (void*) free_blk->buffer;
         }
-        prevp = &free_blk->next_free;
-        free_blk = free_blk->next_free;
+    }
+    else {
+        heap_memory_block** prevp = &allocator->bins[bin];
+        free_blk = *prevp;
+        while (free_blk) {
+            if (free_blk->capacity >= cap_net) {
+                *prevp = free_blk->next_free;
+                free_blk->next_free = NULL;
+                free_blk->size = size;
+                if (locked) pthread_mutex_unlock(lock);
+                memset(free_blk + 1, 0, cap_net);
+                return (void*) free_blk->buffer;
+            }
+            prevp = &free_blk->next_free;
+            free_blk = free_blk->next_free;
+        }
     }
 
     heap_page* target_page = NULL;
@@ -333,30 +434,38 @@ static inline void* c_heap_request(heap_allocator* allocator, size_t size, int s
     }
 
     if (!target_page) {
+        size_t target_cap;
+#if AP_HEAP_PAGE_FIT_TO_REQUEST
+        /* Fit the page to the request (floor = autopage_capacity): rare
+         * bin misses must not extend oversized pages. */
+        target_cap = allocator->autopage_capacity;
+#else
+        /* Page scaling with a cap: double from the current page size up to
+         * AP_HEAP_PAGE_EXTEND_MAX.  A page larger than the cap (e.g. from
+         * a huge request) scales back down to the cap.  Requests larger
+         * than the cap force a bigger page via the fit loop below. */
         heap_page* current = allocator->active_page;
-        size_t     target_cap;
-
         if (!current) {
             target_cap = allocator->autopage_capacity;
-            while (target_cap < cap_total + sizeof(heap_page)) {
-                target_cap *= 2;
-            }
         }
         else {
-            size_t prev_cap = current->capacity;
-            size_t new_cap = prev_cap;
-
-            if (new_cap < allocator->autopage_capacity) {
-                new_cap = allocator->autopage_capacity;
+            target_cap = current->capacity;
+            if (target_cap < allocator->autopage_capacity) {
+                target_cap = allocator->autopage_capacity;
             }
-            else if (new_cap < allocator->autopage_capacity_max) {
-                new_cap *= 2;
+            else if (target_cap > (size_t) AP_HEAP_PAGE_EXTEND_MAX) {
+                target_cap = (size_t) AP_HEAP_PAGE_EXTEND_MAX;
             }
-
-            while (new_cap < cap_total + sizeof(heap_page)) {
-                new_cap *= 2;
+            else if (target_cap < (size_t) AP_HEAP_PAGE_EXTEND_MAX) {
+                target_cap *= 2;
+                if (target_cap > (size_t) AP_HEAP_PAGE_EXTEND_MAX) {
+                    target_cap = (size_t) AP_HEAP_PAGE_EXTEND_MAX;
+                }
             }
-            target_cap = new_cap;
+        }
+#endif
+        while (target_cap < cap_total + sizeof(heap_page)) {
+            target_cap *= 2;
         }
 
         target_page = c_heap_allocator_extend(allocator, target_cap, child_lock);
@@ -410,8 +519,9 @@ static inline void c_heap_free(void* ptr, pthread_mutex_t* lock) {
     }
 
     block->size = 0;
-    block->next_free = allocator->free_list;
-    allocator->free_list = block;
+    size_t bin = c_heap_block_bin(block->capacity);
+    block->next_free = allocator->bins[bin];
+    allocator->bins[bin] = block;
 
     if (locked) pthread_mutex_unlock(lock);
 }
