@@ -112,8 +112,14 @@ Key macros (see `macros.json` for full list):
 | `AP_ALLOC_WITH_FREELIST` | `1` | Free-list reuse |
 | `AP_HEAP_AUTOPAGE_CAPACITY` | `64 KiB` | Default heap page size |
 | `AP_HEAP_AUTOPAGE_CAPACITY_MAX` | `16 MiB` | Max heap page size |
+| `AP_HEAP_EXACT_BIN_COUNT` | `8192` | Exact 8-byte-granular free-list bins |
+| `AP_HEAP_LARGE_BIN_COUNT` | `9` | Pow2-class free-list bins for large blocks |
+| `AP_HEAP_PAGE_EXTEND_MAX` | `128 MiB` | Max auto-page extension on bin miss |
+| `AP_HEAP_EXACT_BIN_PROBE_COUNT` | `2` | Larger exact bins to probe before extending |
 | `AP_SHM_AUTOPAGE_CAPACITY` | `64 KiB` | Default SHM page size |
 | `AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE` | `128 GiB` | SHM virtual region |
+| `AP_SHM_EXACT_BIN_COUNT` | `8192` | Exact 8-byte-granular free-list bins |
+| `AP_SHM_PAGE_EXTEND_MAX` | `128 MiB` | Max auto-page extension on bin miss |
 
 ### Using `get_include()` in Downstream Projects
 
