@@ -7,3 +7,11 @@ from cbase.backports.pylong import (
     _INT128_MAX,
     _INT128_MIN
 )
+
+from cbase.backports.telemetrics import (
+    LOGGER,
+    LOG_LEVEL,
+    ColoredFormatter,
+    DuplicateWarningFilter,
+    get_logger,
+)
