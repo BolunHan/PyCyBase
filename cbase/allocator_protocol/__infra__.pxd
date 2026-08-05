@@ -25,10 +25,14 @@ from .c_allocator_protocol cimport (
 
 from .c_heap_allocator cimport (
     AP_HEAP_AUTOPAGE_CAPACITY, AP_HEAP_AUTOPAGE_CAPACITY_MAX, AP_HEAP_AUTOPAGE_ALIGNMENT,
+    AP_HEAP_EXACT_BIN_COUNT, AP_HEAP_LARGE_BIN_COUNT, AP_HEAP_BIN_COUNT,
+    AP_HEAP_PAGE_EXTEND_MAX, AP_HEAP_PAGE_FIT_TO_REQUEST, AP_HEAP_EXACT_BIN_PROBE_COUNT,
 
     heap_memory_block, heap_page, heap_allocator,
     c_heap_page_roundup,
     c_heap_block_roundup,
+    c_heap_block_ceil_log2,
+    c_heap_block_bin,
     c_heap_page_reclaim,
 
     c_heap_allocator_extend,
@@ -44,6 +48,8 @@ from .c_heap_allocator cimport (
 
 from .c_shm_comp cimport (
     AP_SHM_AUTOPAGE_CAPACITY, AP_SHM_AUTOPAGE_CAPACITY_MAX, AP_SHM_AUTOPAGE_ALIGNMENT, AP_SHM_ALLOCATOR_PREFIX, AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE,
+    AP_SHM_EXACT_BIN_COUNT, AP_SHM_LARGE_BIN_COUNT, AP_SHM_BIN_COUNT,
+    AP_SHM_PAGE_EXTEND_MAX, AP_SHM_PAGE_FIT_TO_REQUEST, AP_SHM_EXACT_BIN_PROBE_COUNT,
 
     shm_allocator, shm_allocator_ctx,
 
