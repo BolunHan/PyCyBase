@@ -1,3 +1,5 @@
+from .c_memory_block cimport MemoryBlock
+
 from .c_allocator_protocol cimport (
     AP_ALLOC_VIGILANT, AP_ALLOC_MAGIC, AP_DEALLOC_MAGIC, AP_DECREF_AUTOFREE,
 

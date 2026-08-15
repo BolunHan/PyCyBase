@@ -1,5 +1,7 @@
 import sys
 
+from .c_memory_block import MemoryBlock
+
 from .c_heap_allocator import (
     ALLOCATOR as HEAP_ALLOCATOR,
     HeapAllocator,
@@ -36,6 +38,7 @@ from .c_allocator_protocol import (
 )
 
 __all__ = [
+    'MemoryBlock',
     'HEAP_ALLOCATOR', 'HeapAllocator', 'HeapMemoryBlock', 'HeapMemoryPage',
     'SHM_ALLOCATOR', 'SharedMemoryAllocator', 'SharedMemoryBlock', 'SharedMemoryPage', 'shm_cleanup',
     'AllocatorProtocol', 'AP_FREELIST', 'AP_LOCKED', 'AP_LOCKFREE', 'AP_SHARED', 'AllocatorConfigContext'
