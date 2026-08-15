@@ -1,0 +1,39 @@
+name: Tests
+
+on:
+    push:
+        branches: [ main ]
+    pull_request:
+        branches: [ main ]
+    workflow_dispatch:  # Allow manual run on latest commit
+
+jobs:
+    test:
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, windows-latest]
+                python-version: ['3.12', '3.13', '3.14']
+        runs-on: ${{ matrix.os }}
+
+        steps:
+            -   name: Checkout repository
+                uses: actions/checkout@v4
+
+            -   name: Set up Python
+                uses: actions/setup-python@v5
+                with:
+                    python-version: ${{ matrix.python-version }}
+
+            -   name: Install build dependencies
+                run: |
+                    python -m pip install --upgrade pip
+                    pip install cython setuptools wheel
+
+            -   name: Build Cython extensions
+                run: python setup.py build_ext --inplace
+                env:
+                    GITHUB_ACTIONS: "true"
+
+            -   name: Run unittest
+                run: python -m unittest discover -s tests
