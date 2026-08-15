@@ -1,5 +1,6 @@
 # PyCyBase
 
+[![tests](https://github.com/BolunHan/PyCyBase/actions/workflows/tests.yml/badge.svg)](https://github.com/BolunHan/PyCyBase/actions/workflows/tests.yml)
 [![docs](https://github.com/BolunHan/PyCyBase/actions/workflows/build-page-docs.yml/badge.svg)](https://github.com/BolunHan/PyCyBase/actions/workflows/build-page-docs.yml)
 [![pypi-linux](https://github.com/BolunHan/PyCyBase/actions/workflows/publish-posix-to-pypi.yml/badge.svg)](https://github.com/BolunHan/PyCyBase/actions/workflows/publish-posix-to-pypi.yml)
 [![pypi-windows](https://github.com/BolunHan/PyCyBase/actions/workflows/publish-nt-to-pypi.yml/badge.svg)](https://github.com/BolunHan/PyCyBase/actions/workflows/publish-nt-to-pypi.yml)
