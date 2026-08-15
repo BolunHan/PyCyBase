@@ -1,9 +1,23 @@
-__version__ = '0.1.11.post1'
+__version__ = '0.1.11.post2'
 
+import ctypes
 import functools
 import os
 import pathlib
 from collections.abc import Mapping
+
+# shm_open/shm_unlink live in librt on glibc < 2.34 (e.g. manylinux_2_28) and in
+# libc on newer glibc. Extensions embedding cbase's allocator headers reference
+# them without linking librt; promoting librt to the dynamic linker's global
+# scope (same pattern as algo_engine.exchange_profile's RTLD_GLOBAL preload)
+# makes those symbols resolvable by every extension loaded after this package.
+# No-op on glibc >= 2.34 (librt is an empty stub) and where librt is absent.
+_RTLD_GLOBAL = getattr(ctypes, 'RTLD_GLOBAL', 0)
+if _RTLD_GLOBAL:
+    try:
+        ctypes.CDLL('librt.so.1', mode=_RTLD_GLOBAL)
+    except Exception:
+        pass  # graceful fallback: symbols are provided by libc on modern systems
 
 from .config_view import CONFIG_VIEW
 from .backports.telemetrics import get_logger
