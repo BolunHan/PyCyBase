@@ -1,4 +1,4 @@
-__version__ = '0.1.11.post2'
+__version__ = '0.2.0'
 
 import ctypes
 import functools
