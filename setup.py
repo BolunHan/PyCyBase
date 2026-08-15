@@ -202,6 +202,12 @@ cython_extension.extend([
         include_dirs=[REPO_ROOT]
     ),
     Extension(
+        name="cbase.allocator_protocol.c_memory_block",
+        sources=["cbase/allocator_protocol/c_memory_block.pyx"],
+        extra_compile_args=COMPILE_FLAGS,
+        include_dirs=[REPO_ROOT]
+    ),
+    Extension(
         name="cbase.allocator_protocol.c_heap_allocator",
         sources=["cbase/allocator_protocol/c_heap_allocator.pyx"],
         extra_compile_args=COMPILE_FLAGS,
