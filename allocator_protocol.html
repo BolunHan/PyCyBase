@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Heap Allocator" href="heap_allocator.html"><link rel="prev" title="Installation" href="installation.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>Allocator Protocol - PyCyBase v0.1.11.post1</title>
+        <title>Allocator Protocol - PyCyBase v0.2.0</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">PyCyBase v0.1.11.post1</div></a>
+      <a href="index.html"><div class="brand">PyCyBase v0.2.0</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -182,7 +182,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">PyCyBase v0.1.11.post1</span>
+  <span class="sidebar-brand-text">PyCyBase v0.2.0</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -247,6 +247,27 @@ pluggable memory allocation layer that dispatches to heap, shared-memory
 (SHM), or raw <code class="docutils literal notranslate"><span class="pre">malloc</span></code> backends based on global environment settings.</p>
 <p>Module: <code class="docutils literal notranslate"><span class="pre">cbase.allocator_protocol</span></code></p>
 <dl class="py class" id="module-cbase.allocator_protocol">
+<dt class="sig sig-object py" id="cbase.allocator_protocol.MemoryBlock">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">cbase.allocator_protocol.</span></span><span class="sig-name descname"><span class="pre">MemoryBlock</span></span><a class="headerlink" href="#cbase.allocator_protocol.MemoryBlock" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Common base for heap/SHM block handles.</p>
+<p>Tracks ownership of the underlying C buffer and holds a strong reference
+to the owning allocator (<code class="docutils literal notranslate"><span class="pre">__allocator__</span></code>), so an allocator can never be
+torn down while its blocks are still alive (e.g. interpreter-exit teardown
+order). Subclasses override <code class="docutils literal notranslate"><span class="pre">_free_block</span></code> to release the C buffer.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="cbase.allocator_protocol.MemoryBlock.owner">
+<span class="sig-name descname"><span class="pre">owner</span></span><a class="headerlink" href="#cbase.allocator_protocol.MemoryBlock.owner" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
 <dt class="sig sig-object py" id="cbase.allocator_protocol.HeapAllocator">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">cbase.allocator_protocol.</span></span><span class="sig-name descname"><span class="pre">HeapAllocator</span></span><a class="headerlink" href="#cbase.allocator_protocol.HeapAllocator" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
@@ -428,7 +449,7 @@ pluggable memory allocation layer that dispatches to heap, shared-memory
 <dl class="py class">
 <dt class="sig sig-object py" id="cbase.allocator_protocol.HeapMemoryBlock">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">cbase.allocator_protocol.</span></span><span class="sig-name descname"><span class="pre">HeapMemoryBlock</span></span><a class="headerlink" href="#cbase.allocator_protocol.HeapMemoryBlock" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<dd><p>Bases: <a class="reference internal" href="#cbase.allocator_protocol.MemoryBlock" title="cbase.allocator_protocol.c_memory_block.MemoryBlock"><code class="xref py py-class docutils literal notranslate"><span class="pre">MemoryBlock</span></code></a></p>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="cbase.allocator_protocol.HeapMemoryBlock.address">
 <span class="sig-name descname"><span class="pre">address</span></span><a class="headerlink" href="#cbase.allocator_protocol.HeapMemoryBlock.address" title="Link to this definition">¶</a></dt>
@@ -475,16 +496,6 @@ pluggable memory allocation layer that dispatches to heap, shared-memory
 <dd><dl class="field-list simple">
 <dt class="field-odd">Type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#cbase.allocator_protocol.HeapMemoryBlock" title="cbase.allocator_protocol.HeapMemoryBlock"><code class="xref py py-class docutils literal notranslate"><span class="pre">HeapMemoryBlock</span></code></a> | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="cbase.allocator_protocol.HeapMemoryBlock.owner">
-<span class="sig-name descname"><span class="pre">owner</span></span><a class="headerlink" href="#cbase.allocator_protocol.HeapMemoryBlock.owner" title="Link to this definition">¶</a></dt>
-<dd><dl class="field-list simple">
-<dt class="field-odd">Type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span></p>
 </dd>
 </dl>
 </dd></dl>
@@ -893,7 +904,7 @@ pluggable memory allocation layer that dispatches to heap, shared-memory
 <dl class="py class">
 <dt class="sig sig-object py" id="cbase.allocator_protocol.SharedMemoryBlock">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">cbase.allocator_protocol.</span></span><span class="sig-name descname"><span class="pre">SharedMemoryBlock</span></span><a class="headerlink" href="#cbase.allocator_protocol.SharedMemoryBlock" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<dd><p>Bases: <a class="reference internal" href="#cbase.allocator_protocol.MemoryBlock" title="cbase.allocator_protocol.c_memory_block.MemoryBlock"><code class="xref py py-class docutils literal notranslate"><span class="pre">MemoryBlock</span></code></a></p>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="cbase.allocator_protocol.SharedMemoryBlock.address">
 <span class="sig-name descname"><span class="pre">address</span></span><a class="headerlink" href="#cbase.allocator_protocol.SharedMemoryBlock.address" title="Link to this definition">¶</a></dt>
@@ -940,16 +951,6 @@ pluggable memory allocation layer that dispatches to heap, shared-memory
 <dd><dl class="field-list simple">
 <dt class="field-odd">Type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#cbase.allocator_protocol.SharedMemoryBlock" title="cbase.allocator_protocol.SharedMemoryBlock"><code class="xref py py-class docutils literal notranslate"><span class="pre">SharedMemoryBlock</span></code></a> | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="cbase.allocator_protocol.SharedMemoryBlock.owner">
-<span class="sig-name descname"><span class="pre">owner</span></span><a class="headerlink" href="#cbase.allocator_protocol.SharedMemoryBlock.owner" title="Link to this definition">¶</a></dt>
-<dd><dl class="field-list simple">
-<dt class="field-odd">Type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span></p>
 </dd>
 </dl>
 </dd></dl>
@@ -1314,6 +1315,10 @@ construction time and selects the appropriate backend.</p>
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">Allocator Protocol</a><ul>
+<li><a class="reference internal" href="#cbase.allocator_protocol.MemoryBlock"><code class="docutils literal notranslate"><span class="pre">MemoryBlock</span></code></a><ul>
+<li><a class="reference internal" href="#cbase.allocator_protocol.MemoryBlock.owner"><code class="docutils literal notranslate"><span class="pre">MemoryBlock.owner</span></code></a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#cbase.allocator_protocol.HeapAllocator"><code class="docutils literal notranslate"><span class="pre">HeapAllocator</span></code></a><ul>
 <li><a class="reference internal" href="#cbase.allocator_protocol.HeapAllocator.__init__"><code class="docutils literal notranslate"><span class="pre">HeapAllocator.__init__()</span></code></a></li>
 <li><a class="reference internal" href="#cbase.allocator_protocol.HeapAllocator.active_page"><code class="docutils literal notranslate"><span class="pre">HeapAllocator.active_page</span></code></a></li>
@@ -1338,7 +1343,6 @@ construction time and selects the appropriate backend.</p>
 <li><a class="reference internal" href="#cbase.allocator_protocol.HeapMemoryBlock.capacity"><code class="docutils literal notranslate"><span class="pre">HeapMemoryBlock.capacity</span></code></a></li>
 <li><a class="reference internal" href="#cbase.allocator_protocol.HeapMemoryBlock.next_allocated"><code class="docutils literal notranslate"><span class="pre">HeapMemoryBlock.next_allocated</span></code></a></li>
 <li><a class="reference internal" href="#cbase.allocator_protocol.HeapMemoryBlock.next_free"><code class="docutils literal notranslate"><span class="pre">HeapMemoryBlock.next_free</span></code></a></li>
-<li><a class="reference internal" href="#cbase.allocator_protocol.HeapMemoryBlock.owner"><code class="docutils literal notranslate"><span class="pre">HeapMemoryBlock.owner</span></code></a></li>
 <li><a class="reference internal" href="#cbase.allocator_protocol.HeapMemoryBlock.parent_page"><code class="docutils literal notranslate"><span class="pre">HeapMemoryBlock.parent_page</span></code></a></li>
 <li><a class="reference internal" href="#cbase.allocator_protocol.HeapMemoryBlock.size"><code class="docutils literal notranslate"><span class="pre">HeapMemoryBlock.size</span></code></a></li>
 </ul>
@@ -1388,7 +1392,6 @@ construction time and selects the appropriate backend.</p>
 <li><a class="reference internal" href="#cbase.allocator_protocol.SharedMemoryBlock.capacity"><code class="docutils literal notranslate"><span class="pre">SharedMemoryBlock.capacity</span></code></a></li>
 <li><a class="reference internal" href="#cbase.allocator_protocol.SharedMemoryBlock.next_allocated"><code class="docutils literal notranslate"><span class="pre">SharedMemoryBlock.next_allocated</span></code></a></li>
 <li><a class="reference internal" href="#cbase.allocator_protocol.SharedMemoryBlock.next_free"><code class="docutils literal notranslate"><span class="pre">SharedMemoryBlock.next_free</span></code></a></li>
-<li><a class="reference internal" href="#cbase.allocator_protocol.SharedMemoryBlock.owner"><code class="docutils literal notranslate"><span class="pre">SharedMemoryBlock.owner</span></code></a></li>
 <li><a class="reference internal" href="#cbase.allocator_protocol.SharedMemoryBlock.page_address"><code class="docutils literal notranslate"><span class="pre">SharedMemoryBlock.page_address</span></code></a></li>
 <li><a class="reference internal" href="#cbase.allocator_protocol.SharedMemoryBlock.size"><code class="docutils literal notranslate"><span class="pre">SharedMemoryBlock.size</span></code></a></li>
 </ul>
@@ -1432,7 +1435,7 @@ construction time and selects the appropriate backend.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=1502e6a6"></script>
+</div><script src="_static/documentation_options.js?v=f54557eb"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
