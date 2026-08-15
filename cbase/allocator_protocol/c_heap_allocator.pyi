@@ -3,6 +3,8 @@ from collections.abc import Generator
 from dataclasses import dataclass
 from typing import Annotated
 
+from cbase.allocator_protocol.c_memory_block import MemoryBlock
+
 
 @dataclass
 class ValueRange:
@@ -14,10 +16,13 @@ UINTPTR_MAX = ctypes.c_void_p(-1).value
 uintptr_t = Annotated[int, ValueRange(0, UINTPTR_MAX), ctypes.c_void_p]
 
 
-class HeapMemoryBlock:
-    """Typed wrapper around an allocator block header."""
+class HeapMemoryBlock(MemoryBlock):
+    """Typed wrapper around an allocator block header.
 
-    owner: bool
+    Attributes:
+        owner: True when this handle owns the underlying C buffer and releases
+            it on deallocation.
+    """
 
     def __init__(self, block: uintptr_t = 0, owner: bool = False) -> None: ...
 

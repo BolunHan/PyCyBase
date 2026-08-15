@@ -1,6 +1,8 @@
 from libc.errno cimport errno
 from libc.stdint cimport uintptr_t
 
+from .c_memory_block cimport MemoryBlock
+
 
 cdef class HeapMemoryPage:
     def __cinit__(self, uintptr_t page_addr=0):
@@ -61,15 +63,12 @@ cdef class HeapMemoryPage:
             return f"{<uintptr_t> self.page.buffer:#0x}"
 
 
-cdef class HeapMemoryBlock:
+cdef class HeapMemoryBlock(MemoryBlock):
     def __cinit__(self, uintptr_t block=0, bint owner=False):
         self.block = <heap_memory_block*> block if block else NULL
         self.owner = owner
 
-    def __dealloc__(self):
-        if not self.owner:
-            return
-
+    cdef void _free_block(self):
         if self.block:
             c_heap_free(self.block.buffer, &self.block.parent_page.allocator.lock)
 
@@ -186,7 +185,9 @@ cdef class HeapAllocator:
         if not p:
             raise OSError(errno, f"<{self.__class__.__name__}> failed to calloc new buffer")
         cdef heap_memory_block* block = <heap_memory_block*> (<char*> p - sizeof(heap_memory_block))
-        return HeapMemoryBlock.c_from_header(block, True)
+        cdef HeapMemoryBlock instance = HeapMemoryBlock.c_from_header(block, True)
+        instance.__allocator__ = self
+        return instance
 
     cpdef HeapMemoryBlock request(self, size_t size, bint with_lock=True, bint scan_all_pages=True):
         if not self.allocator:
@@ -196,7 +197,9 @@ cdef class HeapAllocator:
         if not p:
             raise OSError(errno, f'<{self.__class__.__name__}> failed to request new buffer')
         cdef heap_memory_block* block = <heap_memory_block*> (<char*> p - sizeof(heap_memory_block))
-        return HeapMemoryBlock.c_from_header(block, True)
+        cdef HeapMemoryBlock instance = HeapMemoryBlock.c_from_header(block, True)
+        instance.__allocator__ = self
+        return instance
 
     cpdef void free(self, HeapMemoryBlock buffer, bint with_lock=True):
         if not self.allocator:
@@ -206,6 +209,7 @@ cdef class HeapAllocator:
         cdef pthread_mutex_t* lock = &buffer.block.parent_page.allocator.lock if with_lock else NULL
         c_heap_free(<void*> buffer.block.buffer, lock)
         buffer.owner = False
+        buffer.__allocator__ = None
         buffer.block = NULL
 
     cpdef void reclaim(self, bint with_lock=True):

@@ -1,3 +1,5 @@
+from cbase.allocator_protocol.c_memory_block cimport MemoryBlock
+
 
 cdef extern from "cbase/allocator_protocol/c_heap_allocator.h":
     const size_t AP_HEAP_AUTOPAGE_CAPACITY
@@ -67,9 +69,8 @@ cdef class HeapMemoryPage:
     cpdef void reclaim(self)
 
 
-cdef class HeapMemoryBlock:
+cdef class HeapMemoryBlock(MemoryBlock):
     cdef heap_memory_block* block
-    cdef readonly bint owner
 
     @staticmethod
     cdef inline HeapMemoryBlock c_from_header(heap_memory_block* header, bint owner=?)

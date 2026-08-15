@@ -3,6 +3,7 @@ import os
 from cpython.unicode cimport PyUnicode_FromString, PyUnicode_AsUTF8
 from libc.errno cimport errno
 
+from .c_memory_block cimport MemoryBlock
 from .c_shm_comp cimport C_SHM_COMP
 
 
@@ -69,15 +70,12 @@ cdef class SharedMemoryPage:
             return None
 
 
-cdef class SharedMemoryBlock:
+cdef class SharedMemoryBlock(MemoryBlock):
     def __cinit__(self, uintptr_t block=0, bint owner=False):
         self.block = <shm_memory_block*> block if block else NULL
         self.owner = owner
 
-    def __dealloc__(self):
-        if not self.owner:
-            return
-
+    cdef void _free_block(self):
         if self.block:
             c_shm_free(self.block.buffer, &self.block.parent_page.allocator.lock)
 
@@ -212,7 +210,9 @@ cdef class SharedMemoryAllocator:
             raise OSError(errno, f'<{self.__class__.__name__}> failed to calloc new buffer')
 
         cdef shm_memory_block* block = <shm_memory_block*> (<char*> p - sizeof(shm_memory_block))
-        return SharedMemoryBlock.c_from_header(block, True)
+        cdef SharedMemoryBlock instance = SharedMemoryBlock.c_from_header(block, True)
+        instance.__allocator__ = self
+        return instance
 
     cpdef SharedMemoryBlock request(self, size_t size, bint scan_all_pages=True, bint with_lock=True):
         if not self.ctx:
@@ -223,7 +223,9 @@ cdef class SharedMemoryAllocator:
             raise OSError(errno, f'<{self.__class__.__name__}> failed to request new buffer')
 
         cdef shm_memory_block* block = <shm_memory_block*> (<char*> p - sizeof(shm_memory_block))
-        return SharedMemoryBlock.c_from_header(block, True)
+        cdef SharedMemoryBlock instance = SharedMemoryBlock.c_from_header(block, True)
+        instance.__allocator__ = self
+        return instance
 
     cpdef void free(self, SharedMemoryBlock buffer, bint with_lock=True):
         if not self.ctx:
@@ -233,6 +235,7 @@ cdef class SharedMemoryAllocator:
         cdef pthread_mutex_t* lock = &self.ctx.shm_allocator.lock if with_lock else NULL
         c_shm_free(<void*> buffer.block.buffer, lock)
         buffer.owner = False
+        buffer.__allocator__ = None
         buffer.block = NULL
 
     cpdef void reclaim(self, bint with_lock=True):

@@ -1,6 +1,8 @@
 from libc.stdint cimport uintptr_t
 from posix.unistd cimport pid_t
 
+from cbase.allocator_protocol.c_memory_block cimport MemoryBlock
+
 
 cdef extern from "<pthread.h>":
     ctypedef struct pthread_mutex_t:
@@ -106,9 +108,8 @@ cdef class SharedMemoryPage:
     cpdef void reclaim(self)
 
 
-cdef class SharedMemoryBlock:
+cdef class SharedMemoryBlock(MemoryBlock):
     cdef shm_memory_block* block
-    cdef readonly bint owner
 
     @staticmethod
     cdef inline SharedMemoryBlock c_from_header(shm_memory_block* header, bint owner=?)
