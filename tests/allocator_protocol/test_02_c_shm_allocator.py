@@ -6,18 +6,22 @@ Every test case uses a fresh SharedMemoryAllocator instance so that state
 Requires /dev/shm (POSIX shared memory).
 """
 import gc
+import sys
 import unittest
 
-from cbase.allocator_protocol.c_shm_allocator import (
-    AP_SHM_ALLOCATOR_PREFIX,
-    AP_SHM_AUTOPAGE_ALIGNMENT,
-    AP_SHM_AUTOPAGE_CAPACITY,
-    AP_SHM_AUTOPAGE_CAPACITY_MAX,
-    AP_SHM_NAME_LEN,
-    SharedMemoryAllocator,
-    SharedMemoryBlock,
-    SharedMemoryPage,
-)
+if sys.platform.startswith('linux'):
+    from cbase.allocator_protocol.c_shm_allocator import (
+        AP_SHM_ALLOCATOR_PREFIX,
+        AP_SHM_AUTOPAGE_ALIGNMENT,
+        AP_SHM_AUTOPAGE_CAPACITY,
+        AP_SHM_AUTOPAGE_CAPACITY_MAX,
+        AP_SHM_NAME_LEN,
+        SharedMemoryAllocator,
+        SharedMemoryBlock,
+        SharedMemoryPage,
+    )
+else:  # pragma: no cover -- the test classes are skipped off-Linux
+    AP_SHM_ALLOCATOR_PREFIX = AP_SHM_AUTOPAGE_ALIGNMENT = AP_SHM_AUTOPAGE_CAPACITY = AP_SHM_AUTOPAGE_CAPACITY_MAX = AP_SHM_NAME_LEN = SharedMemoryAllocator = SharedMemoryBlock = SharedMemoryPage = None
 
 
 # ---------------------------------------------------------------------------
@@ -45,6 +49,7 @@ class _FreshAllocatorMixin:
 # Constants
 # ---------------------------------------------------------------------------
 
+@unittest.skipUnless(sys.platform.startswith("linux"), "POSIX shared-memory allocator tests are Linux-only")
 class TestShmConstants(unittest.TestCase):
     """Verify compile-time constants are exported correctly."""
 
@@ -68,6 +73,7 @@ class TestShmConstants(unittest.TestCase):
 # Constructor / creation
 # ---------------------------------------------------------------------------
 
+@unittest.skipUnless(sys.platform.startswith("linux"), "POSIX shared-memory allocator tests are Linux-only")
 class TestShmAllocatorCreation(unittest.TestCase):
     """Creating and destroying SharedMemoryAllocator instances."""
 
@@ -97,6 +103,7 @@ class TestShmAllocatorCreation(unittest.TestCase):
 # Config properties
 # ---------------------------------------------------------------------------
 
+@unittest.skipUnless(sys.platform.startswith("linux"), "POSIX shared-memory allocator tests are Linux-only")
 class TestShmAllocatorConfig(_FreshAllocatorMixin, unittest.TestCase):
     """The three autopage config fields on shm_allocator."""
 
@@ -130,6 +137,7 @@ class TestShmAllocatorConfig(_FreshAllocatorMixin, unittest.TestCase):
 # calloc
 # ---------------------------------------------------------------------------
 
+@unittest.skipUnless(sys.platform.startswith("linux"), "POSIX shared-memory allocator tests are Linux-only")
 class TestShmCalloc(_FreshAllocatorMixin, unittest.TestCase):
 
     def test_calloc_size_1(self):
@@ -176,6 +184,7 @@ class TestShmCalloc(_FreshAllocatorMixin, unittest.TestCase):
 # request
 # ---------------------------------------------------------------------------
 
+@unittest.skipUnless(sys.platform.startswith("linux"), "POSIX shared-memory allocator tests are Linux-only")
 class TestShmRequest(_FreshAllocatorMixin, unittest.TestCase):
 
     def test_request_basic(self):
@@ -247,6 +256,7 @@ class TestShmRequest(_FreshAllocatorMixin, unittest.TestCase):
 # free
 # ---------------------------------------------------------------------------
 
+@unittest.skipUnless(sys.platform.startswith("linux"), "POSIX shared-memory allocator tests are Linux-only")
 class TestShmFree(_FreshAllocatorMixin, unittest.TestCase):
 
     def test_free_increases_free_list(self):
@@ -287,6 +297,7 @@ class TestShmFree(_FreshAllocatorMixin, unittest.TestCase):
 # reclaim
 # ---------------------------------------------------------------------------
 
+@unittest.skipUnless(sys.platform.startswith("linux"), "POSIX shared-memory allocator tests are Linux-only")
 class TestShmReclaim(_FreshAllocatorMixin, unittest.TestCase):
 
     def test_reclaim_reduces_page_occupied(self):
@@ -322,6 +333,7 @@ class TestShmReclaim(_FreshAllocatorMixin, unittest.TestCase):
 # extend
 # ---------------------------------------------------------------------------
 
+@unittest.skipUnless(sys.platform.startswith("linux"), "POSIX shared-memory allocator tests are Linux-only")
 class TestShmExtend(_FreshAllocatorMixin, unittest.TestCase):
 
     def test_extend_default_creates_page(self):
@@ -364,6 +376,7 @@ class TestShmExtend(_FreshAllocatorMixin, unittest.TestCase):
 # Iteration
 # ---------------------------------------------------------------------------
 
+@unittest.skipUnless(sys.platform.startswith("linux"), "POSIX shared-memory allocator tests are Linux-only")
 class TestShmIteration(_FreshAllocatorMixin, unittest.TestCase):
 
     def test_pages_empty_initially(self):
@@ -437,6 +450,7 @@ class TestShmIteration(_FreshAllocatorMixin, unittest.TestCase):
 # Memory patterns
 # ---------------------------------------------------------------------------
 
+@unittest.skipUnless(sys.platform.startswith("linux"), "POSIX shared-memory allocator tests are Linux-only")
 class TestShmPatterns(_FreshAllocatorMixin, unittest.TestCase):
 
     def test_write_full_block_4k(self):
@@ -470,6 +484,7 @@ class TestShmPatterns(_FreshAllocatorMixin, unittest.TestCase):
 # Edge cases
 # ---------------------------------------------------------------------------
 
+@unittest.skipUnless(sys.platform.startswith("linux"), "POSIX shared-memory allocator tests are Linux-only")
 class TestShmEdgeCases(_FreshAllocatorMixin, unittest.TestCase):
 
     def test_allocator_repr(self):

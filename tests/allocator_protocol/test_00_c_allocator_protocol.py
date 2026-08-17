@@ -1,4 +1,5 @@
 import multiprocessing as mp
+import os
 import unittest
 
 from cbase.allocator_protocol.c_allocator_protocol import (
@@ -272,6 +273,7 @@ class TestAllocatorProtocolWithShared(unittest.TestCase):
     # Fork-mode tests  — POSIX named SHM enables cross-process sharing
     # ------------------------------------------------------------------
 
+    @unittest.skipUnless(hasattr(os, "fork"), "fork start method is POSIX-only")
     def test_fork_child_reads_parent_data(self):
         """Parent writes to the SHM buffer; the forked child reads the same
         data through the global _FORK_ALLOC reference and reports it back
@@ -303,6 +305,7 @@ class TestAllocatorProtocolWithShared(unittest.TestCase):
 
         _FORK_ALLOC = None
 
+    @unittest.skipUnless(hasattr(os, "fork"), "fork start method is POSIX-only")
     def test_fork_child_writes_parent_sees(self):
         """Parent writes seed data, child overwrites a portion through the
         shared buffer, and the parent observes the child's modifications
@@ -349,6 +352,7 @@ class TestAllocatorProtocolWithShared(unittest.TestCase):
     # Fork-mode tests with ~AP_SHARED (heap-backed, no cross-process sharing)
     # ------------------------------------------------------------------
 
+    @unittest.skipUnless(hasattr(os, "fork"), "fork start method is POSIX-only")
     def test_fork_no_shared_child_write_not_visible_to_parent(self):
         """Under ~AP_SHARED the buffer is heap-backed.  A forked child's
         writes trigger CoW and must NOT be visible to the parent."""
@@ -385,6 +389,7 @@ class TestAllocatorProtocolWithShared(unittest.TestCase):
 
         _FORK_ALLOC = None
 
+    @unittest.skipUnless(hasattr(os, "fork"), "fork start method is POSIX-only")
     def test_fork_no_shared_parent_write_not_visible_to_child(self):
         """Under ~AP_SHARED, the parent modifies its buffer after fork;
         the child must still see the pre-fork snapshot (CoW isolation)."""

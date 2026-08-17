@@ -9,11 +9,15 @@ A wrapper deallocating AFTER the allocator's segments are unmapped
 segfaults, so every wrapper must be freed explicitly (try/finally).
 """
 import gc
+import sys
 import unittest
 
-from cbase.allocator_protocol.c_shm_allocator import (
-    SharedMemoryAllocator,
-)
+if sys.platform.startswith('linux'):
+    from cbase.allocator_protocol.c_shm_allocator import (
+        SharedMemoryAllocator,
+    )
+else:  # pragma: no cover -- the test classes are skipped off-Linux
+    SharedMemoryAllocator = None
 
 
 class _FreshAllocatorMixin:
@@ -35,6 +39,7 @@ class _FreshAllocatorMixin:
 # Exact-bin reuse
 # ---------------------------------------------------------------------------
 
+@unittest.skipUnless(sys.platform.startswith("linux"), "POSIX shared-memory allocator tests are Linux-only")
 class TestShmExactBinReuse(_FreshAllocatorMixin, unittest.TestCase):
     def test_same_size_returns_same_pointer(self):
         first = self.allocator.request(64)
@@ -84,6 +89,7 @@ class TestShmExactBinReuse(_FreshAllocatorMixin, unittest.TestCase):
 # Cross-bin isolation
 # ---------------------------------------------------------------------------
 
+@unittest.skipUnless(sys.platform.startswith("linux"), "POSIX shared-memory allocator tests are Linux-only")
 class TestShmCrossBinIsolation(_FreshAllocatorMixin, unittest.TestCase):
     def test_small_free_not_reused_by_larger_request(self):
         small = self.allocator.request(64)
@@ -106,6 +112,7 @@ class TestShmCrossBinIsolation(_FreshAllocatorMixin, unittest.TestCase):
 # Exact-bin probe (AP_SHM_EXACT_BIN_PROBE_COUNT, default 2)
 # ---------------------------------------------------------------------------
 
+@unittest.skipUnless(sys.platform.startswith("linux"), "POSIX shared-memory allocator tests are Linux-only")
 class TestShmExactBinProbe(_FreshAllocatorMixin, unittest.TestCase):
     def test_probe_uses_slightly_larger_block(self):
         big = self.allocator.request(72)   # capacity 72 -> bin 9
@@ -153,6 +160,7 @@ class TestShmExactBinProbe(_FreshAllocatorMixin, unittest.TestCase):
 # Pow2-class bins
 # ---------------------------------------------------------------------------
 
+@unittest.skipUnless(sys.platform.startswith("linux"), "POSIX shared-memory allocator tests are Linux-only")
 class TestShmPow2Bins(_FreshAllocatorMixin, unittest.TestCase):
     def test_same_size_reuse(self):
         block = self.allocator.request(70000)
@@ -198,6 +206,7 @@ class TestShmPow2Bins(_FreshAllocatorMixin, unittest.TestCase):
 # Steady state
 # ---------------------------------------------------------------------------
 
+@unittest.skipUnless(sys.platform.startswith("linux"), "POSIX shared-memory allocator tests are Linux-only")
 class TestShmSteadyState(_FreshAllocatorMixin, unittest.TestCase):
     def test_churn_does_not_grow_pages(self):
         for _ in range(1000):
