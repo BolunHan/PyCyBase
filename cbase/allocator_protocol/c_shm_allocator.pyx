@@ -254,22 +254,12 @@ cdef class SharedMemoryAllocator:
             prefix = prefix[1:]
 
         cdef str shm_name, candidate
-        cdef pid_t p
         for shm_name in entries:
             if not shm_name.startswith(prefix):
                 continue
             candidate = '/' + shm_name
-            p = c_shm_pid(PyUnicode_AsUTF8(candidate))
-            if p <= 0:
-                continue
-            try:
-                os.kill(p, 0)
-            except ProcessLookupError:
+            if c_shm_pid_stale(PyUnicode_AsUTF8(candidate)) > 0:
                 out.append(candidate)
-            except PermissionError:
-                continue
-            except OSError:
-                continue
         return out
 
     cpdef list dangling_pages(self, str shm_prefix=None):
@@ -282,22 +272,12 @@ cdef class SharedMemoryAllocator:
             prefix = prefix[1:]
 
         cdef str shm_name, candidate
-        cdef pid_t p
         for shm_name in entries:
             if not shm_name.startswith(prefix):
                 continue
             candidate = '/' + shm_name
-            p = c_shm_pid(PyUnicode_AsUTF8(candidate))
-            if p <= 0:
-                continue
-            try:
-                os.kill(p, 0)
-            except ProcessLookupError:
+            if c_shm_pid_stale(PyUnicode_AsUTF8(candidate)) > 0:
                 out.append(candidate)
-            except PermissionError:
-                continue
-            except OSError:
-                continue
         return out
 
     cpdef void cleanup_dangling(self, str shm_prefix=None):
@@ -433,6 +413,8 @@ globals()['AP_SHM_ALLOCATOR_PREFIX'] = PyUnicode_FromString(AP_SHM_ALLOCATOR_PRE
 globals()['AP_SHM_NAME_LEN'] = AP_SHM_NAME_LEN
 globals()['AP_SHM_PREFIX_MAX'] = AP_SHM_PREFIX_MAX
 globals()['AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE'] = AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE
+globals()['AP_SHM_STALE_CHECK'] = AP_SHM_STALE_CHECK
+globals()['AP_SHM_UNLINK_ON_MAP'] = AP_SHM_UNLINK_ON_MAP
 
 
 def cleanup():

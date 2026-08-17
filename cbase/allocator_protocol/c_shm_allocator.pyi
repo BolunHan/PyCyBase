@@ -27,6 +27,8 @@ the compiled extension.
 - ``AP_SHM_NAME_LEN``: 256                         # max SHM name length
 - ``AP_SHM_PREFIX_MAX``: 64                        # max custom prefix length
 - ``AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE``: 128 << 30  # 128 GiB
+- ``AP_SHM_STALE_CHECK``: 1   # on-start stale SHM scan (default ON)
+- ``AP_SHM_UNLINK_ON_MAP``: 1  # unlink SHM objects right after mapping
 
 Naming convention
 -----------------
@@ -199,21 +201,27 @@ class SharedMemoryAllocator:
         """Reclaim freed space across all pages."""
 
     def dangling(self, shm_prefix: str | None = None) -> list[str]:
-        """Return allocator SHM names whose creator PID is gone.
+        """Return allocator SHM names whose creator is stale (dead, zombie,
+        or PID-reused) using the same C-level liveness check as the
+        on-start scan.
 
         Args:
             shm_prefix: Prefix to scan for (None for default, appends ``_ac``).
         """
 
     def dangling_pages(self, shm_prefix: str | None = None) -> list[str]:
-        """Return page SHM names whose creator PID is gone.
+        """Return page SHM names whose creator is stale (dead, zombie,
+        or PID-reused) using the same C-level liveness check as the
+        on-start scan.
 
         Args:
             shm_prefix: Prefix to scan for (None for default, appends ``_pg``).
         """
 
     def cleanup_dangling(self, shm_prefix: str | None = None) -> None:
-        """Unlink dangling allocator and page SHM objects.
+        """Unlink stale (dead, zombie, or PID-reused creator) allocator and
+        page SHM objects; each unlink logs ``[AP] [STALE_SHM] ...`` to
+        stderr.
 
         Args:
             shm_prefix: Prefix to scan for (None for default).
@@ -302,3 +310,5 @@ AP_SHM_ALLOCATOR_PREFIX: str
 AP_SHM_NAME_LEN: int
 AP_SHM_PREFIX_MAX: int
 AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE: int
+AP_SHM_STALE_CHECK: int
+AP_SHM_UNLINK_ON_MAP: int

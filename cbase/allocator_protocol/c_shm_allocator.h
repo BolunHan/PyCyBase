@@ -83,6 +83,22 @@
 #define AP_SHM_EXACT_BIN_PROBE_COUNT 2
 #endif
 
+/* On-start stale SHM scan: when c_shm_allocator_new runs, unlink allocator
+ * and page SHM objects left behind by dead, zombie, or PID-reused creators.
+ * 0 disables the scan (only c_shm_clear_dangling called explicitly). */
+#ifndef AP_SHM_STALE_CHECK
+#define AP_SHM_STALE_CHECK 1
+#endif
+
+/* Unlink SHM objects right after mapping (unlink-while-mapped): the name
+ * vanishes from /dev/shm immediately while the mapping stays valid, so the
+ * kernel reclaims the storage when the last mapping is dropped -- a crashed
+ * creator leaks nothing.  0 keeps objects reachable by name until
+ * c_shm_allocator_free unlinks them. */
+#ifndef AP_SHM_UNLINK_ON_MAP
+#define AP_SHM_UNLINK_ON_MAP 1
+#endif
+
 typedef struct shm_page {
     size_t                   capacity;  // total capacity, excluding metadata
     size_t                   occupied;  // bytes occupied, excluding metadata
@@ -253,13 +269,30 @@ static inline int c_shm_scan_page(const char* shm_prefix, char* out);
 /**
  * @brief Extract pid embedded in allocator/page SHM name.
  *
- * The name format is {prefix}_{pid_hex}_{suffix}.  This function locates
- * the pid by scanning from the right — it is prefix-agnostic.
+ * The name format is {prefix}_ac_{pid_hex}[_{suffix}] (allocator) or
+ * {prefix}_pg_{pid_hex}_{suffix} (page).  The pid is located via the
+ * "_ac_" / "_pg_" marker — it is prefix-agnostic.
  *
  * @param shm_name SHM object name (with or without leading '/').
  * @return pid on success, -1 with errno=EINVAL on parse failure.
  */
 static inline pid_t c_shm_pid(const char* shm_name);
+
+/**
+ * @brief Classify a SHM object by its creator's liveness.
+ *
+ * Robust stale detection beyond kill(pid, 0):
+ *   - pid does not exist                 -> 1 (dead)
+ *   - pid is a zombie (Linux /proc state Z) -> 2 (zombie)
+ *   - pid is alive but started AFTER the SHM object was created
+ *     (Linux start-time vs. object ctime)  -> 3 (pid reused)
+ *   - pid is alive and predates the object -> 0 (not stale)
+ *
+ * @param shm_name SHM object name (with or without leading '/').
+ * @return 1/2/3 stale (dead/zombie/pid-reused), 0 not stale,
+ *         -1 unknown (treat conservatively as not stale).
+ */
+static inline int c_shm_pid_stale(const char* shm_name);
 
 /**
  * @brief Find and map a dangling allocator (whose creator pid is gone).
@@ -437,6 +470,12 @@ static inline int c_shm_page_map(shm_allocator* allocator, shm_page_ctx* page_ct
         return -1;
     }
 
+#if AP_SHM_UNLINK_ON_MAP
+    // Unlink while mapped (see c_shm_allocator_new): the page object dies
+    // with its last mapping -- a crashed creator leaks nothing.
+    shm_unlink(page_ctx->shm_page->shm_name);
+#endif
+
     // Step 0: Point to metadata at start of page
     shm_page* page_meta = (shm_page*) mapped;
     memcpy(page_meta, page_ctx->shm_page, c_shm_page_overhead);
@@ -595,6 +634,12 @@ static inline shm_allocator_ctx* c_shm_allocator_new(size_t region_size, const c
         region_size = AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE;  // 128 GiB
     }
 
+#if AP_SHM_STALE_CHECK
+    // On-start stale scan: reclaim objects left behind by dead, zombie,
+    // or PID-reused creators before creating our own.
+    c_shm_clear_dangling(shm_prefix);
+#endif
+
     // Step 1: Reserve virtual address space for the 128 GiB page region
     void* virtual_region = mmap(
         NULL, region_size,
@@ -675,6 +720,12 @@ static inline shm_allocator_ctx* c_shm_allocator_new(size_t region_size, const c
     ctx->shm_allocator = meta;
     ctx->shm_fd = meta_fd;
     ctx->active_page = NULL;
+
+#if AP_SHM_UNLINK_ON_MAP
+    // Unlink while mapped: the object survives as long as any process maps
+    // it; the name is gone immediately, so a crashed creator leaks nothing.
+    shm_unlink(meta_shm_name);
+#endif
 
     return ctx;
 
@@ -1093,27 +1144,25 @@ static inline pid_t c_shm_pid(const char* shm_name) {
         base++;
     }
 
-    // Name format: {prefix}_{pid_hex}_{suffix}
-    // Walk from the right: find last '_' (suffix separator),
-    // then the '_' before it (pid separator).
-    const char* suffix_us = strrchr(base, '_');
-    if (!suffix_us) {
+    // Name format: {prefix}_ac_{pid_hex}[_{suffix}] (allocator) or
+    //              {prefix}_pg_{pid_hex}_{suffix} (page).
+    // Locate the "_ac_" / "_pg_" marker and parse the hex pid after it;
+    // this is prefix-agnostic and works for both formats.
+    const char* pid_start = strstr(base, "_ac_");
+    if (!pid_start) {
+        pid_start = strstr(base, "_pg_");
+    }
+    if (!pid_start) {
         errno = EINVAL;
         return -1;
     }
+    pid_start += 4;  // skip marker
 
-    // Find the underscore that starts the pid segment (rightmost before suffix)
-    const char* pid_us = NULL;
-    for (const char* p = base; p < suffix_us; p++) {
-        if (*p == '_') pid_us = p;
+    const char* end = pid_start;
+    while (*end && *end != '_') {
+        end++;
     }
-    if (!pid_us) {
-        errno = EINVAL;
-        return -1;
-    }
-
-    const char* pid_start = pid_us + 1;
-    size_t      pid_len = (size_t) (suffix_us - pid_start);
+    size_t pid_len = (size_t) (end - pid_start);
     if (pid_len == 0 || pid_len >= 32) {
         errno = EINVAL;
         return -1;
@@ -1137,6 +1186,121 @@ static inline pid_t c_shm_pid(const char* shm_name) {
     }
 
     return (pid_t) v;
+}
+
+#ifdef __linux__
+/* Process state char from /proc/<pid>/stat ('R', 'S', 'Z', ...); 0 on error.
+ * The comm field is in parentheses and may contain spaces, so the state is
+ * read as the first char after the rightmost ')'. */
+static inline char c_shm_proc_state(pid_t pid) {
+    char  path[64];
+    FILE* f;
+    char  buf[1024];
+    char  state = 0;
+
+    snprintf(path, sizeof(path), "/proc/%ld/stat", (long) pid);
+    f = fopen(path, "r");
+    if (!f) return 0;
+
+    if (fgets(buf, sizeof(buf), f)) {
+        const char* rp = strrchr(buf, ')');
+        if (rp && rp[1] == ' ') state = rp[2];
+    }
+    fclose(f);
+    return state;
+}
+
+/* Process start time in clock ticks since boot (field 22 of
+ * /proc/<pid>/stat); 0 on error. */
+static inline unsigned long long c_shm_proc_starttime(pid_t pid) {
+    char             path[64];
+    FILE*            f;
+    char             buf[1024];
+    unsigned long long starttime = 0;
+
+    snprintf(path, sizeof(path), "/proc/%ld/stat", (long) pid);
+    f = fopen(path, "r");
+    if (!f) return 0;
+
+    if (fgets(buf, sizeof(buf), f)) {
+        const char* rp = strrchr(buf, ')');
+        if (rp) {
+            /* Fields after ')': state, ppid, pgrp, session, tty_nr, tpgid,
+             * flags, minflt, cminflt, majflt, cmajflt, utime, stime,
+             * cutime, cstime, priority, nice, num_threads, itrealvalue,
+             * then starttime (20th field after the comm) -- 19 skipped. */
+            sscanf(rp + 2,
+                   "%*c %*d %*d %*d %*d %*d %*u %*lu %*lu %*lu %*lu %*lu %*lu %*lu %*ld %*ld %*ld %*ld %*ld %llu",
+                   &starttime);
+        }
+    }
+    fclose(f);
+    return starttime;
+}
+
+/* System boot time in seconds since epoch (from /proc/stat "btime"); 0 on
+ * error. */
+static inline unsigned long long c_shm_boot_time(void) {
+    FILE*            f;
+    char             buf[256];
+    unsigned long long btime = 0;
+
+    f = fopen("/proc/stat", "r");
+    if (!f) return 0;
+
+    while (fgets(buf, sizeof(buf), f)) {
+        if (sscanf(buf, "btime %llu", &btime) == 1) break;
+    }
+    fclose(f);
+    return btime;
+}
+#endif  // __linux__
+
+static inline int c_shm_pid_stale(const char* shm_name) {
+    pid_t pid = c_shm_pid(shm_name);
+    if (pid <= 0) {
+        return -1;  // unparseable; treat conservatively as not stale
+    }
+
+    if (kill(pid, 0) == -1) {
+        // ESRCH: process gone.  Any other error (e.g. EPERM) means the
+        // process exists but is not ours to inspect -- not stale.
+        return (errno == ESRCH) ? 1 : 0;
+    }
+
+#ifdef __linux__
+    char state = c_shm_proc_state(pid);
+    if (state == 'Z') {
+        return 2;  // zombie: creator exited, not yet reaped
+    }
+    if (state == 0) {
+        return 1;  // vanished between kill and /proc read
+    }
+
+    // PID-reuse guard: a process that started AFTER the SHM object was
+    // created cannot be its creator.
+    char path[AP_SHM_NAME_LEN + 16];
+    const char* base = shm_name;
+    if (base[0] == '/') base++;
+    snprintf(path, sizeof(path), "/dev/shm/%s", base);
+
+    struct stat st;
+    if (stat(path, &st) == 0) {
+        unsigned long long btime = c_shm_boot_time();
+        unsigned long long starttime = c_shm_proc_starttime(pid);
+        if (btime && starttime) {
+            long             hz = sysconf(_SC_CLK_TCK);
+            unsigned long long proc_start = btime + (starttime / (unsigned long long) (hz > 0 ? hz : 100));
+            if ((unsigned long long) st.st_ctime < proc_start) {
+                return 3;  // pid reused
+            }
+        }
+    }
+#else
+    (void) shm_name;
+#endif
+
+    return 0;
 }
 
 static inline shm_allocator* c_shm_allocator_dangling(const char* shm_prefix, char* shm_name) {
@@ -1175,11 +1339,9 @@ static inline shm_allocator* c_shm_allocator_dangling(const char* shm_prefix, ch
         memcpy(candidate + 1, ent->d_name, name_len);
         candidate[1 + name_len] = '\0';
 
-        pid_t pid = c_shm_pid(candidate);
-        if (pid <= 0) continue;
-
-        if (kill(pid, 0) == 0 || errno != ESRCH) {
-            errno = 0;  // either alive or another error; treat as not dangling
+        int stale = c_shm_pid_stale(candidate);
+        if (stale <= 0) {
+            errno = 0;  // alive, unparseable, or unknown; treat as not dangling
             continue;
         }
 
@@ -1203,6 +1365,9 @@ static inline shm_allocator* c_shm_allocator_dangling(const char* shm_prefix, ch
         strncpy(shm_name, candidate, AP_SHM_NAME_LEN - 1);
         shm_name[AP_SHM_NAME_LEN - 1] = '\0';
         mapped = (shm_allocator*) map;
+        fprintf(stderr, "[AP] [STALE_SHM] map dangling allocator %s (pid %ld, %s)\n",
+                candidate, (long) c_shm_pid(candidate),
+                stale == 2 ? "zombie" : stale == 3 ? "pid_reused" : "dead");
         break;
     }
 
@@ -1216,6 +1381,7 @@ static inline shm_allocator* c_shm_allocator_dangling(const char* shm_prefix, ch
 }
 
 static inline void c_shm_clear_dangling(const char* shm_prefix) {
+#if AP_SHM_STALE_CHECK
     DIR* dir = opendir("/dev/shm");
     if (!dir) {
         return;
@@ -1253,18 +1419,21 @@ static inline void c_shm_clear_dangling(const char* shm_prefix) {
         memcpy(candidate + 1, ent->d_name, name_len);
         candidate[1 + name_len] = '\0';
 
-        pid_t pid = c_shm_pid(candidate);
-        if (pid <= 0) {
-            continue;
+        int stale = c_shm_pid_stale(candidate);
+        if (stale <= 0) {
+            continue;  // alive, unparseable, or unknown
         }
 
-        errno = 0;
-        if (kill(pid, 0) == -1 && errno == ESRCH) {
-            shm_unlink(candidate);  // best effort
-        }
+        shm_unlink(candidate);  // best effort
+        fprintf(stderr, "[AP] [STALE_SHM] unlink %s (pid %ld, %s)\n",
+                candidate, (long) c_shm_pid(candidate),
+                stale == 2 ? "zombie" : stale == 3 ? "pid_reused" : "dead");
     }
 
     closedir(dir);
+#else
+    (void) shm_prefix;
+#endif
 }
 
 #endif  // AP_SHM_C_SHM_ALLOCATOR_H

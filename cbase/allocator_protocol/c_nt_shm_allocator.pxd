@@ -13,6 +13,8 @@ cdef extern from "cbase/allocator_protocol/c_nt_shm_allocator.h":
     const size_t AP_SHM_PAGE_EXTEND_MAX
     const size_t AP_SHM_PAGE_FIT_TO_REQUEST
     const size_t AP_SHM_EXACT_BIN_PROBE_COUNT
+    const size_t AP_SHM_STALE_CHECK
+    const size_t AP_SHM_UNLINK_ON_MAP
     const size_t c_nt_shm_page_overhead
     const size_t c_nt_shm_block_overhead
 

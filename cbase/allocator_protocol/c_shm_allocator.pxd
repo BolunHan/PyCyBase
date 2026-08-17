@@ -28,6 +28,8 @@ cdef extern from "cbase/allocator_protocol/c_shm_allocator.h":
     const size_t AP_SHM_PAGE_EXTEND_MAX
     const size_t AP_SHM_PAGE_FIT_TO_REQUEST
     const size_t AP_SHM_EXACT_BIN_PROBE_COUNT
+    const size_t AP_SHM_STALE_CHECK
+    const size_t AP_SHM_UNLINK_ON_MAP
     const size_t c_shm_page_overhead
     const size_t c_shm_block_overhead
 
@@ -95,6 +97,7 @@ cdef extern from "cbase/allocator_protocol/c_shm_allocator.h":
     int c_shm_scan_allocator(const char* shm_prefix, char* out) noexcept nogil
     int c_shm_scan_page(const char* shm_prefix, char* out) noexcept nogil
     pid_t c_shm_pid(const char* shm_name) noexcept nogil
+    int c_shm_pid_stale(const char* shm_name) noexcept nogil
     shm_allocator* c_shm_allocator_dangling(const char* shm_prefix, char* shm_name) noexcept nogil
     void c_shm_clear_dangling(const char* shm_prefix) noexcept nogil
 

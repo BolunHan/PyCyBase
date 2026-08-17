@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <windows.h>
+#include <tlhelp32.h>
 
 #include "cbase/nt/pthread_nt_compat.h"
 
@@ -81,6 +82,23 @@
  * is bounded by the probe range.  0 disables the probe. */
 #ifndef AP_SHM_EXACT_BIN_PROBE_COUNT
 #define AP_SHM_EXACT_BIN_PROBE_COUNT 2
+#endif
+
+/* On-start stale SHM scan: when c_nt_shm_allocator_new runs, sweep for
+ * allocator and page mappings whose creator pid is dead (best-effort --
+ * a mapping held by a live process is not destroyed).  0 disables the
+ * scan (only c_nt_shm_clear_dangling called explicitly). */
+#ifndef AP_SHM_STALE_CHECK
+#define AP_SHM_STALE_CHECK 1
+#endif
+
+/* Close the section handle right after mapping (NT equivalent of
+ * unlink-while-mapped): the view keeps the object alive for this process
+ * and the kernel destroys it when the last view is unmapped -- a crashed
+ * creator leaks nothing.  0 keeps objects openable by name until
+ * c_nt_shm_allocator_free closes the handles. */
+#ifndef AP_SHM_UNLINK_ON_MAP
+#define AP_SHM_UNLINK_ON_MAP 1
 #endif
 
 // ========== Structs ==========
@@ -429,6 +447,8 @@ static inline nt_shm_allocator* c_nt_shm_allocator_dangling(const char* shm_pref
 
         // Convert wide name back to UTF-8 for output
         WideCharToMultiByte(CP_UTF8, 0, wide_name, -1, shm_name, AP_SHM_NAME_LEN, NULL, NULL);
+        fprintf(stderr, "[AP] [STALE_SHM] map dangling allocator %s (pid %lu, dead)\n",
+                shm_name, (unsigned long) try_pid);
         return (nt_shm_allocator*) map;
     }
 
@@ -444,10 +464,36 @@ static inline nt_shm_allocator* c_nt_shm_allocator_dangling(const char* shm_pref
  * the actual cleanup happens when the last handle is closed.
  */
 static inline void c_nt_shm_clear_dangling(const char* shm_prefix) {
+#if AP_SHM_STALE_CHECK
     if (!shm_prefix) shm_prefix = AP_SHM_ALLOCATOR_PREFIX;
 
     const char* pfx = shm_prefix;
     if (pfx[0] == '/') pfx++;
+
+    // Live-pid bitmap from a single Toolhelp32 snapshot: avoids 65k
+    // OpenProcess probes per scan.  NULL means "snapshot failed" and
+    // forces the per-pid probe fallback below.
+    unsigned char* alive = (unsigned char*) calloc(1, 65536 / 8);
+    if (alive) {
+        HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (snap != INVALID_HANDLE_VALUE) {
+            PROCESSENTRY32W pe;
+            pe.dwSize = sizeof(pe);
+            if (Process32FirstW(snap, &pe)) {
+                do {
+                    DWORD pid = pe.th32ProcessID;
+                    if (pid < 65536) {
+                        alive[pid >> 3] |= (unsigned char) (1u << (pid & 7));
+                    }
+                } while (Process32NextW(snap, &pe));
+            }
+            CloseHandle(snap);
+        }
+        else {
+            free(alive);
+            alive = NULL;  // fall back to per-pid probing
+        }
+    }
 
     const char* suffixes[] = {"ac", "pg"};
     size_t      suffix_count = 2;
@@ -456,16 +502,33 @@ static inline void c_nt_shm_clear_dangling(const char* shm_prefix) {
         DWORD try_pid = (GetCurrentProcessId() + offset) % 65536;
         if (try_pid == 0) continue;
 
-        if (c_nt_shm_process_alive(try_pid)) continue;
+        if (alive) {
+            if ((alive[try_pid >> 3] >> (try_pid & 7)) & 1u) continue;
+        }
+        else if (c_nt_shm_process_alive(try_pid)) {
+            continue;
+        }
 
         for (size_t i = 0; i < suffix_count; i++) {
             wchar_t wide_name[AP_SHM_NAME_LEN];
             swprintf(wide_name, AP_SHM_NAME_LEN, L"Global\\%hs_%hs_%lx", pfx, suffixes[i], (unsigned long) try_pid);
 
             HANDLE h = OpenFileMappingW(FILE_MAP_READ, FALSE, wide_name);
-            if (h) CloseHandle(h);  // Closing our handle helps destroy the mapping
+            if (h) {
+                CloseHandle(h);  // Closing our handle helps destroy the mapping
+                char utf8_name[AP_SHM_NAME_LEN];
+                if (WideCharToMultiByte(CP_UTF8, 0, wide_name, -1, utf8_name, AP_SHM_NAME_LEN, NULL, NULL) > 0) {
+                    fprintf(stderr, "[AP] [STALE_SHM] close dangling mapping %s (pid %lu, dead)\n",
+                            utf8_name, (unsigned long) try_pid);
+                }
+            }
         }
     }
+
+    free(alive);
+#else
+    (void) shm_prefix;
+#endif
 }
 
 // ========== Page Management ==========
@@ -535,6 +598,13 @@ static inline int c_nt_shm_page_map(nt_shm_allocator* allocator, nt_shm_page_ctx
     if (!mapped) {
         return -1;
     }
+
+#if AP_SHM_UNLINK_ON_MAP
+    // Close the section handle (see c_nt_shm_allocator_new): the view
+    // keeps the page alive for this process -- a crash leaks nothing.
+    CloseHandle(page_ctx->handle);
+    page_ctx->handle = NULL;
+#endif
 
     // Copy metadata to start of mapped page
     nt_shm_page* page_meta = (nt_shm_page*) mapped;
@@ -681,6 +751,12 @@ static inline nt_shm_allocator_ctx* c_nt_shm_allocator_new(size_t region_size, c
         abort();
     }
 
+#if AP_SHM_STALE_CHECK
+    // On-start stale scan: sweep mappings left behind by dead creators
+    // before creating our own (best-effort on NT).
+    c_nt_shm_clear_dangling(shm_prefix);
+#endif
+
     // Step 1: Create named file mapping for allocator metadata
     char meta_shm_name[AP_SHM_NAME_LEN];
     c_nt_shm_allocator_name(shm_prefix, meta_shm_name);
@@ -698,6 +774,15 @@ static inline nt_shm_allocator_ctx* c_nt_shm_allocator_new(size_t region_size, c
 
     if (!meta_hMapping) {
         free(ctx);
+        return NULL;
+    }
+
+    if (GetLastError() == ERROR_ALREADY_EXISTS) {
+        // A live peer already owns this name.  Opening and wiping its meta
+        // would corrupt the peer's allocator -- fail cleanly instead.
+        CloseHandle(meta_hMapping);
+        free(ctx);
+        errno = EEXIST;
         return NULL;
     }
 
@@ -764,6 +849,14 @@ static inline nt_shm_allocator_ctx* c_nt_shm_allocator_new(size_t region_size, c
     ctx->shm_handle = meta_hMapping;
     ctx->lock_handle = lock_handle;
     ctx->active_page = NULL;
+
+#if AP_SHM_UNLINK_ON_MAP
+    // Close the section handle: the mapped view keeps the object alive
+    // for this process, and the kernel destroys it when the last view is
+    // unmapped -- a crashed creator leaks nothing.
+    CloseHandle(meta_hMapping);
+    ctx->shm_handle = NULL;
+#endif
 
     return ctx;
 }
