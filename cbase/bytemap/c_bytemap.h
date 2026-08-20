@@ -10,7 +10,10 @@
 #ifdef _WIN32
 #include <process.h>
 #define getpid _getpid
+#include <BaseTsd.h>
+typedef SSIZE_T ssize_t;  // MSVC lacks the POSIX ssize_t
 #else
+#include <sys/types.h>
 #include <unistd.h>
 #endif
 
@@ -171,6 +174,10 @@ static inline bytemap*       c_bytemap_ex_clone(const bytemap* src, allocator_pr
 static inline int            c_bytemap_ex_set_double(bytemap* map, const char* key, size_t key_len, double value, uint64_t seq_id);
 static inline int            c_bytemap_ex_get_double(const bytemap* map, const char* key, size_t key_len, double* out);
 static inline int            c_bytemap_ex_pop_double(bytemap* map, const char* key, size_t key_len, uint64_t seq_id, double* out);
+
+static inline int            c_bytemap_ex_set_ssize_t(bytemap* map, const char* key, size_t key_len, ssize_t value, uint64_t seq_id);
+static inline int            c_bytemap_ex_get_ssize_t(const bytemap* map, const char* key, size_t key_len, ssize_t* out);
+static inline int            c_bytemap_ex_pop_ssize_t(bytemap* map, const char* key, size_t key_len, uint64_t seq_id, ssize_t* out);
 
 static inline bytemap*       c_bytemap_new(size_t capacity, allocator_protocol* allocator);
 static inline void           c_bytemap_clear(bytemap* map);
@@ -714,6 +721,20 @@ static inline int c_bytemap_ex_get_double(const bytemap* map, const char* key, s
 }
 
 static inline int c_bytemap_ex_pop_double(bytemap* map, const char* key, size_t key_len, uint64_t seq_id, double* out) {
+    return c_bytemap_ex_pop(map, key, key_len, seq_id, (char*) out, NULL);
+}
+
+// ========== Predefined typed helpers (ssize_t) ==========
+
+static inline int c_bytemap_ex_set_ssize_t(bytemap* map, const char* key, size_t key_len, ssize_t value, uint64_t seq_id) {
+    return c_bytemap_ex_set(map, key, key_len, (const char*) &value, sizeof(ssize_t), seq_id, NULL);
+}
+
+static inline int c_bytemap_ex_get_ssize_t(const bytemap* map, const char* key, size_t key_len, ssize_t* out) {
+    return c_bytemap_ex_get(map, key, key_len, (char*) out, NULL);
+}
+
+static inline int c_bytemap_ex_pop_ssize_t(bytemap* map, const char* key, size_t key_len, uint64_t seq_id, ssize_t* out) {
     return c_bytemap_ex_pop(map, key, key_len, seq_id, (char*) out, NULL);
 }
 

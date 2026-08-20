@@ -116,6 +116,10 @@ cdef extern from "cbase/bytemap/c_bytemap.h":
     int c_bytemap_ex_get_double(const bytemap* bmap, const char* key, size_t key_len, double* out) noexcept nogil
     int c_bytemap_ex_pop_double(bytemap* bmap, const char* key, size_t key_len, uint64_t seq_id, double* out) noexcept nogil
 
+    int c_bytemap_ex_set_ssize_t(bytemap* bmap, const char* key, size_t key_len, ssize_t value, uint64_t seq_id) noexcept nogil
+    int c_bytemap_ex_get_ssize_t(const bytemap* bmap, const char* key, size_t key_len, ssize_t* out) noexcept nogil
+    int c_bytemap_ex_pop_ssize_t(bytemap* bmap, const char* key, size_t key_len, uint64_t seq_id, ssize_t* out) noexcept nogil
+
     bytemap* c_bytemap_new(size_t capacity, allocator_protocol* allocator) noexcept nogil
     void c_bytemap_clear(bytemap* bmap) noexcept nogil
     void c_bytemap_free(bytemap* bmap) noexcept nogil
