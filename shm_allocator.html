@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="ByteMap" href="bytemap.html"><link rel="prev" title="Heap Allocator" href="heap_allocator.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>Shared-Memory Allocator - PyCyBase v0.2.0</title>
+        <title>Shared-Memory Allocator - PyCyBase v0.2.2</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">PyCyBase v0.2.0</div></a>
+      <a href="index.html"><div class="brand">PyCyBase v0.2.2</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -182,7 +182,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">PyCyBase v0.2.0</span>
+  <span class="sidebar-brand-text">PyCyBase v0.2.2</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -739,7 +739,7 @@ is provided.</p></li>
     <span class="n">AP_SHM_AUTOPAGE_CAPACITY</span><span class="p">,</span>             <span class="c1"># 64 KiB — first/auto page size</span>
     <span class="n">AP_SHM_AUTOPAGE_CAPACITY_MAX</span><span class="p">,</span>         <span class="c1"># 16 MiB — maximum page size</span>
     <span class="n">AP_SHM_AUTOPAGE_ALIGNMENT</span><span class="p">,</span>            <span class="c1"># 4 KiB — page alignment</span>
-    <span class="n">AP_SHM_ALLOCATOR_PREFIX</span><span class="p">,</span>              <span class="c1"># &quot;/c_cbase_shm&quot; — default SHM prefix</span>
+    <span class="n">AP_SHM_ALLOCATOR_PREFIX</span><span class="p">,</span>              <span class="c1"># "/c_cbase_shm" — default SHM prefix</span>
     <span class="n">AP_SHM_NAME_LEN</span><span class="p">,</span>                      <span class="c1"># 256 — max SHM name length</span>
     <span class="n">AP_SHM_PREFIX_MAX</span><span class="p">,</span>                    <span class="c1"># 64 — max custom prefix length</span>
     <span class="n">AP_SHM_ALLOCATOR_DEFAULT_REGION_SIZE</span><span class="p">,</span> <span class="c1"># 128 GiB — default region size</span>
@@ -775,7 +775,7 @@ is provided.</p></li>
 <span class="n">alloc</span> <span class="o">=</span> <span class="n">SharedMemoryAllocator</span><span class="p">()</span>
 
 <span class="c1"># Or with custom region size and SHM prefix</span>
-<span class="n">alloc</span> <span class="o">=</span> <span class="n">SharedMemoryAllocator</span><span class="p">(</span><span class="n">region_size</span><span class="o">=</span><span class="mi">64</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span><span class="p">,</span> <span class="n">shm_prefix</span><span class="o">=</span><span class="s2">&quot;/my_app_shm&quot;</span><span class="p">)</span>
+<span class="n">alloc</span> <span class="o">=</span> <span class="n">SharedMemoryAllocator</span><span class="p">(</span><span class="n">region_size</span><span class="o">=</span><span class="mi">64</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span><span class="p">,</span> <span class="n">shm_prefix</span><span class="o">=</span><span class="s2">"/my_app_shm"</span><span class="p">)</span>
 
 <span class="c1"># Extend with a default-sized page</span>
 <span class="n">page</span> <span class="o">=</span> <span class="n">alloc</span><span class="o">.</span><span class="n">extend</span><span class="p">()</span>
@@ -827,13 +827,13 @@ is provided.</p></li>
 <span class="n">alloc</span><span class="o">.</span><span class="n">cleanup_dangling</span><span class="p">()</span>
 
 <span class="c1"># Or target a specific prefix</span>
-<span class="n">alloc</span><span class="o">.</span><span class="n">cleanup_dangling</span><span class="p">(</span><span class="n">shm_prefix</span><span class="o">=</span><span class="s2">&quot;/my_custom_prefix&quot;</span><span class="p">)</span>
+<span class="n">alloc</span><span class="o">.</span><span class="n">cleanup_dangling</span><span class="p">(</span><span class="n">shm_prefix</span><span class="o">=</span><span class="s2">"/my_custom_prefix"</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
 <section id="extracting-creator-pid-from-shm-names">
 <h3>Extracting Creator PID from SHM Names<a class="headerlink" href="#extracting-creator-pid-from-shm-names" title="Link to this heading">¶</a></h3>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">pid</span> <span class="o">=</span> <span class="n">SharedMemoryAllocator</span><span class="o">.</span><span class="n">get_pid</span><span class="p">(</span><span class="s2">&quot;/c_cbase_shm_ac_12345_7f...&quot;</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">pid</span> <span class="o">=</span> <span class="n">SharedMemoryAllocator</span><span class="o">.</span><span class="n">get_pid</span><span class="p">(</span><span class="s2">"/c_cbase_shm_ac_12345_7f..."</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">pid</span><span class="p">)</span>  <span class="c1"># 12345</span>
 </pre></div>
 </div>
@@ -981,7 +981,7 @@ pointer stability.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=f54557eb"></script>
+</div><script src="_static/documentation_options.js?v=7cb4b966"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

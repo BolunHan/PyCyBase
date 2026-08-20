@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Backports" href="backports.html"><link rel="prev" title="ByteMap" href="bytemap.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>Intern String - PyCyBase v0.2.0</title>
+        <title>Intern String - PyCyBase v0.2.2</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">PyCyBase v0.2.0</div></a>
+      <a href="index.html"><div class="brand">PyCyBase v0.2.2</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -182,7 +182,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">PyCyBase v0.2.0</span>
+  <span class="sidebar-brand-text">PyCyBase v0.2.2</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -653,35 +653,35 @@ underlying C <code class="docutils literal notranslate"><span class="pre">istr_m
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">cbase.intern_string</span><span class="w"> </span><span class="kn">import</span> <span class="n">POOL</span>
 
 <span class="c1"># Intern a string (returns an InternString view)</span>
-<span class="n">aapl</span> <span class="o">=</span> <span class="n">POOL</span><span class="o">.</span><span class="n">istr</span><span class="p">(</span><span class="s2">&quot;AAPL&quot;</span><span class="p">)</span>
-<span class="n">tsla</span> <span class="o">=</span> <span class="n">POOL</span><span class="o">.</span><span class="n">istr</span><span class="p">(</span><span class="s2">&quot;TSLA&quot;</span><span class="p">)</span>
+<span class="n">aapl</span> <span class="o">=</span> <span class="n">POOL</span><span class="o">.</span><span class="n">istr</span><span class="p">(</span><span class="s2">"AAPL"</span><span class="p">)</span>
+<span class="n">tsla</span> <span class="o">=</span> <span class="n">POOL</span><span class="o">.</span><span class="n">istr</span><span class="p">(</span><span class="s2">"TSLA"</span><span class="p">)</span>
 
 <span class="c1"># Same string → same view</span>
-<span class="n">aapl_again</span> <span class="o">=</span> <span class="n">POOL</span><span class="o">.</span><span class="n">istr</span><span class="p">(</span><span class="s2">&quot;AAPL&quot;</span><span class="p">)</span>
+<span class="n">aapl_again</span> <span class="o">=</span> <span class="n">POOL</span><span class="o">.</span><span class="n">istr</span><span class="p">(</span><span class="s2">"AAPL"</span><span class="p">)</span>
 <span class="k">assert</span> <span class="n">aapl</span> <span class="ow">is</span> <span class="n">aapl_again</span>  <span class="c1"># Identity!</span>
 
 <span class="c1"># Comparison</span>
 <span class="k">assert</span> <span class="n">aapl</span> <span class="o">!=</span> <span class="n">tsla</span>
-<span class="k">assert</span> <span class="n">aapl</span> <span class="o">==</span> <span class="s2">&quot;AAPL&quot;</span>  <span class="c1"># Compares to plain str</span>
+<span class="k">assert</span> <span class="n">aapl</span> <span class="o">==</span> <span class="s2">"AAPL"</span>  <span class="c1"># Compares to plain str</span>
 
 <span class="c1"># Hash for dict/set use</span>
 <span class="n">tickers</span> <span class="o">=</span> <span class="p">{</span><span class="n">aapl</span><span class="p">,</span> <span class="n">tsla</span><span class="p">}</span>
 
 <span class="c1"># Access properties</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">aapl</span><span class="o">.</span><span class="n">string</span><span class="p">)</span>      <span class="c1"># &quot;AAPL&quot;</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">aapl</span><span class="o">.</span><span class="n">string</span><span class="p">)</span>      <span class="c1"># "AAPL"</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">aapl</span><span class="o">.</span><span class="n">hash_value</span><span class="p">)</span>  <span class="c1"># 64-bit FNV-1a hash</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">aapl</span><span class="o">.</span><span class="n">address</span><span class="p">)</span>     <span class="c1"># Hex C pointer, e.g. &quot;0x7f...&quot;</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">aapl</span><span class="o">.</span><span class="n">address</span><span class="p">)</span>     <span class="c1"># Hex C pointer, e.g. "0x7f..."</span>
 </pre></div>
 </div>
 <p>Pool membership:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">pool</span> <span class="o">=</span> <span class="n">POOL</span>
 
 <span class="c1"># Check membership (no side effects)</span>
-<span class="k">assert</span> <span class="s2">&quot;AAPL&quot;</span> <span class="ow">in</span> <span class="n">pool</span>
-<span class="k">assert</span> <span class="s2">&quot;UNKNOWN&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">pool</span>
+<span class="k">assert</span> <span class="s2">"AAPL"</span> <span class="ow">in</span> <span class="n">pool</span>
+<span class="k">assert</span> <span class="s2">"UNKNOWN"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">pool</span>
 
 <span class="c1"># Direct lookup (raises KeyError if missing)</span>
-<span class="n">view</span> <span class="o">=</span> <span class="n">pool</span><span class="p">[</span><span class="s2">&quot;AAPL&quot;</span><span class="p">]</span>
+<span class="n">view</span> <span class="o">=</span> <span class="n">pool</span><span class="p">[</span><span class="s2">"AAPL"</span><span class="p">]</span>
 
 <span class="c1"># Pool size</span>
 <span class="nb">print</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">pool</span><span class="p">))</span>  <span class="c1"># Number of interned strings</span>
@@ -696,7 +696,7 @@ underlying C <code class="docutils literal notranslate"><span class="pre">istr_m
 
 <span class="c1"># Creates a new pool with default allocator (SHM-backed)</span>
 <span class="n">local</span> <span class="o">=</span> <span class="n">InternStringPool</span><span class="p">()</span>
-<span class="n">local</span><span class="o">.</span><span class="n">istr</span><span class="p">(</span><span class="s2">&quot;hello&quot;</span><span class="p">)</span>
+<span class="n">local</span><span class="o">.</span><span class="n">istr</span><span class="p">(</span><span class="s2">"hello"</span><span class="p">)</span>
 </pre></div>
 </div>
 <section id="benchmark-toolkit">
@@ -708,8 +708,8 @@ underlying C <code class="docutils literal notranslate"><span class="pre">istr_m
 <span class="n">results</span> <span class="o">=</span> <span class="n">toolkit</span><span class="o">.</span><span class="n">run_test</span><span class="p">()</span>
 
 <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">results</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-    <span class="k">if</span> <span class="n">k</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;_ns&quot;</span><span class="p">):</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">k</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">v</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> ns&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">k</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">"_ns"</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">k</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">v</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> ns"</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -719,20 +719,20 @@ underlying C <code class="docutils literal notranslate"><span class="pre">istr_m
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">cbase.intern_string</span><span class="w"> </span><span class="kn">import</span> <span class="n">POOL</span>
 
-<span class="n">POOL</span><span class="o">.</span><span class="n">istr</span><span class="p">(</span><span class="s2">&quot;shared_data&quot;</span><span class="p">)</span>
+<span class="n">POOL</span><span class="o">.</span><span class="n">istr</span><span class="p">(</span><span class="s2">"shared_data"</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">POOL</span><span class="p">))</span>  <span class="c1"># e.g., 1</span>
 
 <span class="n">pid</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">fork</span><span class="p">()</span>
 <span class="k">if</span> <span class="n">pid</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
     <span class="c1"># Child: sees all pre-fork entries</span>
     <span class="nb">print</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">POOL</span><span class="p">))</span>         <span class="c1"># 1</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;shared_data&quot;</span> <span class="ow">in</span> <span class="n">POOL</span><span class="p">)</span>  <span class="c1"># True</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"shared_data"</span> <span class="ow">in</span> <span class="n">POOL</span><span class="p">)</span>  <span class="c1"># True</span>
 
     <span class="c1"># Insertions in child are visible to parent (SHM-backed)</span>
-    <span class="n">POOL</span><span class="o">.</span><span class="n">istr</span><span class="p">(</span><span class="s2">&quot;child_data&quot;</span><span class="p">)</span>
+    <span class="n">POOL</span><span class="o">.</span><span class="n">istr</span><span class="p">(</span><span class="s2">"child_data"</span><span class="p">)</span>
 <span class="k">else</span><span class="p">:</span>
     <span class="n">os</span><span class="o">.</span><span class="n">waitpid</span><span class="p">(</span><span class="n">pid</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;child_data&quot;</span> <span class="ow">in</span> <span class="n">POOL</span><span class="p">)</span>  <span class="c1"># True — SHM-backed</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"child_data"</span> <span class="ow">in</span> <span class="n">POOL</span><span class="p">)</span>  <span class="c1"># True — SHM-backed</span>
 </pre></div>
 </div>
 <div class="admonition seealso">
@@ -863,7 +863,7 @@ underlying C <code class="docutils literal notranslate"><span class="pre">istr_m
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=f54557eb"></script>
+</div><script src="_static/documentation_options.js?v=7cb4b966"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

@@ -65,20 +65,20 @@ The header ``cbase/backports/pylong.h`` exposes these C functions
        c_u128_cmp,
    )
 
-=======================  ====================================================
-Function                 Description
-=======================  ====================================================
-``c_read_uint128(p)``    Read ``uint128_t`` from a byte buffer
-``c_write_uint128(p, v)`` Write ``uint128_t`` to a byte buffer
-``c_read_int128(p)``     Read ``int128_t`` from a byte buffer
-``c_write_int128(p, v)`` Write ``int128_t`` to a byte buffer
-``PyLong_FromUInt128(v)``  Convert ``uint128_t`` → Python ``int``
-``PyLong_FromInt128(v)``   Convert ``int128_t`` → Python ``int``
+============================  ====================================================
+Function                      Description
+============================  ====================================================
+``c_read_uint128(p)``         Read ``uint128_t`` from a byte buffer
+``c_write_uint128(p, v)``     Write ``uint128_t`` to a byte buffer
+``c_read_int128(p)``          Read ``int128_t`` from a byte buffer
+``c_write_int128(p, v)``      Write ``int128_t`` to a byte buffer
+``PyLong_FromUInt128(v)``     Convert ``uint128_t`` → Python ``int``
+``PyLong_FromInt128(v)``      Convert ``int128_t`` → Python ``int``
 ``PyLong_AsUInt128(obj, *v)`` Convert Python ``int`` → ``uint128_t``
 ``PyLong_AsInt128(obj, *v)``  Convert Python ``int`` → ``int128_t``
-``c_u128_cmp(a, b)``       Compare two ``uint128_t`` values
-``c_i128_cmp(a, b)``       Compare two ``int128_t`` values
-=======================  ====================================================
+``c_u128_cmp(a, b)``          Compare two ``uint128_t`` values
+``c_i128_cmp(a, b)``          Compare two ``int128_t`` values
+============================  ====================================================
 
 Cross-Platform Design
 ~~~~~~~~~~~~~~~~~~~~~
