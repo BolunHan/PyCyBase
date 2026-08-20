@@ -140,10 +140,12 @@ cdef extern from "cbase/bytemap/c_bytemap.h":
     void* c_bytemap_entry_value_as_ptr(const bytemap_entry* entry) noexcept nogil
     uintptr_t c_bytemap_entry_value_as_uintptr(const bytemap_entry* entry) noexcept nogil
     double c_bytemap_entry_value_as_double(const bytemap_entry* entry) noexcept nogil
+    ssize_t c_bytemap_entry_value_as_ssize_t(const bytemap_entry* entry) noexcept nogil
 
     void c_bytemap_entry_value_from_ptr(bytemap_entry* entry, const void* ptr) noexcept nogil
     void c_bytemap_entry_value_from_uintptr(bytemap_entry* entry, uintptr_t val) noexcept nogil
     void c_bytemap_entry_value_from_double(bytemap_entry* entry, double val) noexcept nogil
+    void c_bytemap_entry_value_from_ssize_t(bytemap_entry* entry, ssize_t val) noexcept nogil
 
 
 cdef object NO_DEFAULT
