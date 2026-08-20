@@ -1228,10 +1228,10 @@ static inline unsigned long long c_shm_proc_starttime(pid_t pid) {
             /* Fields after ')': state, ppid, pgrp, session, tty_nr, tpgid,
              * flags, minflt, cminflt, majflt, cmajflt, utime, stime,
              * cutime, cstime, priority, nice, num_threads, itrealvalue,
-             * then starttime (20th field after the comm) -- 19 skipped. */
-            sscanf(rp + 2,
-                   "%*c %*d %*d %*d %*d %*d %*u %*lu %*lu %*lu %*lu %*lu %*lu %*lu %*ld %*ld %*ld %*ld %*ld %llu",
-                   &starttime);
+             * then starttime (20th field after the comm) -- 19 skipped.
+             * Suppressed conversions carry no length modifier (GCC warns
+             * -Wformat when '*' is combined with 'l'). */
+            sscanf(rp + 2, "%*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %*u %*u %*d %*d %*d %*d %*d %llu", &starttime);
         }
     }
     fclose(f);
