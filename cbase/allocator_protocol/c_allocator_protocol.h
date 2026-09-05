@@ -60,10 +60,63 @@ typedef nt_shm_memory_block  shm_memory_block;
 
 // ========== Structs ==========
 
+// clang-format off
+
+typedef enum ap_callback_event {
+    // Schematic Event (0x00)
+    AP_CALLBACK_EVENT_NEW               = 0x0000,
+    AP_CALLBACK_EVENT_FREE              = 0x0001,
+    // Lifecycle Management (0x00)
+    AP_CALLBACK_EVENT_INIT              = 0x0002,
+    AP_CALLBACK_EVENT_DEALLOC           = 0x0003,
+    // Content Management (0x01)
+    AP_CALLBACK_EVENT_CLEAR             = 0x0101,
+    // Ref Counting Update (0x02)
+    AP_CALLBACK_EVENT_INCREF            = 0x0201,
+    AP_CALLBACK_EVENT_DECREF            = 0x0202,
+    AP_CALLBACK_EVENT_NOREF             = 0x0203,
+    // Ownership Binding Event (0x04)
+    AP_CALLBACK_EVENT_ACQUIRE_OWNERSHIP = 0x0401,
+    AP_CALLBACK_EVENT_RELEASE_OWNERSHIP = 0x0402
+} ap_callback_event;
+
+// clang-format on
+
+/**
+ * @brief Unified callback signature for allocator-protocol events.
+ *
+ * The callback derives the protocol from buf (c_ap_protocol_from_ptr) to
+ * read the current state (ref_count, size, ...). buf is non-const — the
+ * callback may update the buffer in place.
+ *
+ * @param event      Event type.
+ * @param buf        Affected buffer (protocol->buf).
+ * @param user_data  Opaque user data pointer passed at registration.
+ */
+typedef void (*ap_callback_func)(ap_callback_event event, void* buf, void* user_data);
+
+/**
+ * @brief Linked-list node for a registered callback.
+ */
+typedef struct ap_callback_ctx {
+    ap_callback_func        fn;         // Callback function pointer.
+    void*                   user_data;  // Opaque data from registration.
+    uintptr_t               id;         // Opaque ID for unregistration.
+    struct ap_callback_ctx* next;       // Next node in linked list.
+} ap_callback_ctx;
+
+typedef enum ap_ret_code {
+    AP_OK = 0,
+    AP_ERR_INVALID_ARG = -1,
+    AP_ERR_OOM = -2,
+    AP_ERR_NOT_FOUND = -3
+} ap_ret_code;
+
 typedef struct allocator_protocol {
     shm_allocator*     shm_allocator;
     shm_allocator_ctx* shm_allocator_ctx;
     heap_allocator*    heap_allocator;
+    ap_callback_ctx*   callbacks;
     bool               with_lock;
     bool               with_shm;
     bool               with_freelist;
@@ -81,6 +134,7 @@ static inline allocator_protocol* c_ap_allocator_protocol_new(size_t size, shm_a
 static inline void                c_ap_allocator_protocol_free(allocator_protocol* protocol);
 static inline int64_t             c_ap_allocator_protocol_acquire_owner(allocator_protocol* protocol);
 static inline int64_t             c_ap_allocator_protocol_release_owner(allocator_protocol* protocol);
+static inline void                c_ap_invoke_callbacks(allocator_protocol* protocol, ap_callback_event event);
 
 static inline allocator_protocol* c_ap_protocol_from_ptr(const void* ptr);
 static inline void*               c_ap_alloc(size_t size, allocator_protocol* schematic);
@@ -90,6 +144,9 @@ static inline void                c_ap_decref(void* ptr);
 static inline char*               c_ap_strdup(const char* src, allocator_protocol* allocator);
 static inline void*               c_ap_realloc(void* src, size_t new_size, allocator_protocol* allocator);
 static inline bool                c_ap_is_allocator_buf(const void* ptr);
+
+static inline int                 c_ap_register_callback(allocator_protocol* protocol, ap_callback_func callback, void* user_data, uintptr_t* out_id);
+static inline int                 c_ap_unregister_callback(allocator_protocol* protocol, uintptr_t callback_id);
 
 // ========== Utilities Functions ==========
 
@@ -135,6 +192,18 @@ static inline allocator_protocol* c_ap_allocator_protocol_new(size_t size, shm_a
 static inline void c_ap_allocator_protocol_free(allocator_protocol* protocol) {
     if (!protocol) return;
 
+    // Fire FREE before the magic is invalidated so observers can still
+    // derive a valid protocol from buf during dispatch.
+    c_ap_invoke_callbacks(protocol, AP_CALLBACK_EVENT_FREE);
+
+    // Free leftover callback nodes (calloc/free — NOT allocator-protocol data).
+    ap_callback_ctx* cb = protocol->callbacks;
+    while (cb) {
+        ap_callback_ctx* next = cb->next;
+        free(cb);
+        cb = next;
+    }
+
 #if AP_ALLOC_VIGILANT > 0
     // Invalidate magic to catch double free or invalid free attempts
     protocol->magic = AP_DEALLOC_MAGIC;
@@ -167,12 +236,27 @@ static inline void c_ap_allocator_protocol_free(allocator_protocol* protocol) {
 
 static inline int64_t c_ap_allocator_protocol_acquire_owner(allocator_protocol* protocol) {
     if (!protocol) return 0;
-    return atomic_fetch_add_explicit(&protocol->ref_count, 1, memory_order_acq_rel) + 1;
+    int64_t ref_count = atomic_fetch_add_explicit(&protocol->ref_count, 1, memory_order_acq_rel) + 1;
+    c_ap_invoke_callbacks(protocol, AP_CALLBACK_EVENT_ACQUIRE_OWNERSHIP);
+    return ref_count;
 }
 
 static inline int64_t c_ap_allocator_protocol_release_owner(allocator_protocol* protocol) {
     if (!protocol) return 0;
-    return atomic_fetch_sub_explicit(&protocol->ref_count, 1, memory_order_acq_rel) - 1;
+    int64_t ref_count = atomic_fetch_sub_explicit(&protocol->ref_count, 1, memory_order_acq_rel) - 1;
+    c_ap_invoke_callbacks(protocol, AP_CALLBACK_EVENT_RELEASE_OWNERSHIP);
+    return ref_count;
+}
+
+static inline void c_ap_invoke_callbacks(allocator_protocol* protocol, ap_callback_event event) {
+    if (!protocol || !protocol->callbacks) return;
+
+    ap_callback_ctx* cb = protocol->callbacks;
+    while (cb) {
+        ap_callback_ctx* next = cb->next;
+        if (cb->fn) cb->fn(event, protocol->buf, cb->user_data);
+        cb = next;
+    }
 }
 
 // ========== Public APIs ==========
@@ -246,6 +330,7 @@ static inline void* c_ap_alloc(size_t size, allocator_protocol* schematic) {
 #if AP_ALLOC_VIGILANT > 0
     clone->magic = AP_ALLOC_MAGIC;
 #endif
+    c_ap_invoke_callbacks(schematic, AP_CALLBACK_EVENT_NEW);
     return (void*) clone->buf;
 }
 
@@ -291,6 +376,8 @@ static inline void c_ap_incref(void* ptr) {
         abort();
     }
 #endif
+
+    c_ap_invoke_callbacks(protocol, AP_CALLBACK_EVENT_INCREF);
 }
 
 static inline void c_ap_decref(void* ptr) {
@@ -305,6 +392,14 @@ static inline void c_ap_decref(void* ptr) {
         abort();
     }
 #endif
+
+    if (ref_count > 0) {
+        c_ap_invoke_callbacks(protocol, AP_CALLBACK_EVENT_DECREF);
+    }
+    else {
+        // Reaching 0 emits NOREF; DEALLOC follows if autofree is enabled.
+        c_ap_invoke_callbacks(protocol, AP_CALLBACK_EVENT_NOREF);
+    }
 
 #if AP_DECREF_AUTOFREE > 0
     if (ref_count == 0) {
@@ -347,6 +442,70 @@ static inline bool c_ap_is_allocator_buf(const void* ptr) {
     (void) ptr;
     return true;
 #endif
+}
+
+/**
+ * @brief Register a callback on an allocator protocol.
+ *
+ * Callback nodes are allocated with calloc and freed with free (short-lived
+ * registration state — NOT allocator-protocol data). Registrations are
+ * process-local: a protocol shared across processes must not be registered
+ * by more than one process at a time.
+ *
+ * @param protocol   Protocol to observe (derive with c_ap_protocol_from_ptr).
+ * @param callback   Unified allocator-protocol callback function.
+ * @param user_data  Opaque pointer passed to every callback invocation.
+ * @param out_id     Receives an opaque ID for unregistration (may be NULL).
+ * @return AP_OK on success, AP_ERR_OOM on allocation failure.
+ */
+static inline int c_ap_register_callback(allocator_protocol* protocol, ap_callback_func callback, void* user_data, uintptr_t* out_id) {
+    if (!protocol || !callback) return AP_ERR_INVALID_ARG;
+
+    ap_callback_ctx* node = (ap_callback_ctx*) calloc(1, sizeof(ap_callback_ctx));
+    if (!node) return AP_ERR_OOM;
+
+    node->fn = callback;
+    node->user_data = user_data;
+    node->id = (uintptr_t) node;
+
+    if (!protocol->callbacks) {
+        protocol->callbacks = node;
+    }
+    else {
+        ap_callback_ctx* tail = protocol->callbacks;
+        while (tail->next) tail = tail->next;
+        tail->next = node;
+    }
+
+    if (out_id) *out_id = node->id;
+    return AP_OK;
+}
+
+/**
+ * @brief Unregister a previously registered callback by its opaque ID.
+ *
+ * @param protocol    Protocol the callback was registered on.
+ * @param callback_id Opaque ID returned by c_ap_register_callback.
+ * @return AP_OK on success, AP_ERR_NOT_FOUND if not registered.
+ */
+static inline int c_ap_unregister_callback(allocator_protocol* protocol, uintptr_t callback_id) {
+    if (!protocol) return AP_ERR_INVALID_ARG;
+
+    ap_callback_ctx* prev = NULL;
+    ap_callback_ctx* curr = protocol->callbacks;
+
+    while (curr) {
+        if (curr->id == callback_id) {
+            if (prev) prev->next = curr->next;
+            else protocol->callbacks = curr->next;
+            free(curr);
+            return AP_OK;
+        }
+        prev = curr;
+        curr = curr->next;
+    }
+
+    return AP_ERR_NOT_FOUND;
 }
 
 #endif /* C_ALLOCATOR_PROTOCOL_H */

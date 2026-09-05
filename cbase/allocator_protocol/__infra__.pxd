@@ -4,6 +4,8 @@ from .c_allocator_protocol cimport (
     AP_ALLOC_VIGILANT, AP_ALLOC_MAGIC, AP_DEALLOC_MAGIC, AP_DECREF_AUTOFREE,
 
     allocator_protocol,
+    ap_callback_event, ap_callback_func, ap_callback_ctx, ap_ret_code,
+
     c_ap_allocator_protocol_new,
     c_ap_allocator_protocol_free,
     c_ap_allocator_protocol_acquire_owner,
@@ -17,6 +19,9 @@ from .c_allocator_protocol cimport (
     c_ap_strdup,
     c_ap_realloc,
     c_ap_is_allocator_buf,
+    c_ap_invoke_callbacks,
+    c_ap_register_callback,
+    c_ap_unregister_callback,
 
     AP_ALLOC_WITH_LOCK, AP_ALLOC_WITH_SHM, AP_ALLOC_WITH_FREELIST,
     EnvConfigContext, AllocatorConfigContext,
