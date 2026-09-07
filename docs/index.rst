@@ -15,6 +15,7 @@ heap, shared-memory, and raw-``malloc`` backends.
 
    installation
    allocator_protocol
+   dual_interface
    heap_allocator
    shm_allocator
    bytemap
