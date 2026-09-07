@@ -30,6 +30,18 @@ from .c_allocator_protocol cimport (
     AP_DEFAULT_ALLOCATOR, AP_SHM_ALLOCATOR, AP_HEAP_ALLOCATOR
 )
 
+from .c_dual_interface cimport (
+    cpp_extra_dealloc_func,
+    ccp_protocol, ccp_bound_pyclass,
+
+    c_ccp_bound_callback_adaptor,
+    c_ccp_bind,
+    c_ccp_bind_embedded,
+    c_ccp_unbind,
+
+    CCPType, CCPBoundBuffer, CCPDualInterfaceTestToolkit,
+)
+
 from .c_heap_allocator cimport (
     AP_HEAP_AUTOPAGE_CAPACITY, AP_HEAP_AUTOPAGE_CAPACITY_MAX, AP_HEAP_AUTOPAGE_ALIGNMENT,
     AP_HEAP_EXACT_BIN_COUNT, AP_HEAP_LARGE_BIN_COUNT, AP_HEAP_BIN_COUNT,
