@@ -1,9 +1,28 @@
-from .c_allocator_protocol cimport c_ap_alloc, c_ap_free, AP_DEFAULT_ALLOCATOR
+from .c_allocator_protocol cimport c_ap_alloc, c_ap_free, AP_DEFAULT_ALLOCATOR, ap_ret_code
 
 
 cdef class CCPType:
     def __dealloc__(self):
-        c_ccp_unbind(self)
+        self.ccp_unbind()
+
+    cdef void ccp_bind(self, void* c_header):
+        """signature as void* c_header as intended, only in this way the cython can skip the otherwise enforced type check."""
+        cdef int ret_code = c_ccp_bind(<PyObject*> self, <const void**> c_header)
+        if ret_code == ap_ret_code.AP_OK:
+            return
+        raise BufferError(f'[CCP] Failed to bind <{self.__class__.__name__}> to allocator_protocol* {<uintptr_t> self.ap_header:#0x}')
+
+    cdef void ccp_bind_embedded(self, void* c_header, const void* parent_header):
+        cdef int ret_code = c_ccp_bind_embedded(<PyObject*> self, <const void**> c_header, parent_header)
+        if ret_code == ap_ret_code.AP_OK:
+            return
+        raise BufferError(f'[CCP] Failed to bind embedded <{self.__class__.__name__}> to allocator_protocol* {<uintptr_t> self.ap_header:#0x}')
+
+    cdef void ccp_unbind(self):
+        cdef int ret_code = c_ccp_unbind(<PyObject*> self)
+        if ret_code == ap_ret_code.AP_OK:
+            return
+        raise BufferError(f'[CCP] Failed to unbind embedded from allocator_protocol* {<uintptr_t> self.ap_header:#0x}')
 
     property address:
         def __get__(self):
@@ -20,7 +39,7 @@ cdef class CCPDoubleArray(CCPType):
 
         self.size = size
         self.owner = True
-        c_ccp_bind(self)
+        self.ccp_bind(&self.header)
 
     def __dealloc__(self):
         if not self.owner:
@@ -34,7 +53,7 @@ cdef class CCPDoubleArray(CCPType):
         cdef CCPDoubleArray instance = CCPDoubleArray.__new__(CCPDoubleArray)
         instance.header = header
         instance.owner = owner
-        c_ccp_bind(instance)
+        instance.ccp_bind(&instance.header)
         return instance
 
     def self_dealloc(self):
