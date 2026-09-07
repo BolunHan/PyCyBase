@@ -11,7 +11,7 @@ typedef void (*cpp_extra_dealloc_func)(PyObject* py_opbject);
 
 typedef struct ccp_protocol {
     // === PyObject_HEAD ====
-    PyObject_HEAD;
+    PyObject_HEAD  // macro already ends with ';' since Python 3.11 — a trailing ';' makes an empty declaration, which MSVC's C frontend rejects (C2059)
     // === Pyx Virt Table ===
     void* __pyx_vtab;
     // === Allocator Protocol ====
