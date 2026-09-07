@@ -65,8 +65,8 @@ typedef nt_shm_memory_block  shm_memory_block;
 typedef enum ap_callback_event {
     // Schematic Event (0x00)
     AP_CALLBACK_EVENT_NEW               = 0x0000,
-    AP_CALLBACK_EVENT_FREE              = 0x0001,
     // Lifecycle Management (0x00)
+    AP_CALLBACK_EVENT_FREE              = 0x0001,
     AP_CALLBACK_EVENT_INIT              = 0x0002,
     AP_CALLBACK_EVENT_DEALLOC           = 0x0003,
     // Content Management (0x01)
@@ -132,8 +132,6 @@ typedef struct allocator_protocol {
 
 static inline allocator_protocol* c_ap_allocator_protocol_new(size_t size, shm_allocator_ctx* shm_allocator, heap_allocator* heap_allocator, bool with_lock);
 static inline void                c_ap_allocator_protocol_free(allocator_protocol* protocol);
-static inline int64_t             c_ap_allocator_protocol_acquire_owner(allocator_protocol* protocol);
-static inline int64_t             c_ap_allocator_protocol_release_owner(allocator_protocol* protocol);
 static inline void                c_ap_invoke_callbacks(allocator_protocol* protocol, ap_callback_event event);
 
 static inline allocator_protocol* c_ap_protocol_from_ptr(const void* ptr);
@@ -141,6 +139,8 @@ static inline void*               c_ap_alloc(size_t size, allocator_protocol* sc
 static inline void                c_ap_free(void* ptr);
 static inline void                c_ap_incref(void* ptr);
 static inline void                c_ap_decref(void* ptr);
+static inline int64_t             c_ap_acquire_ownership(allocator_protocol* protocol);
+static inline int64_t             c_ap_release_ownership(allocator_protocol* protocol);
 static inline char*               c_ap_strdup(const char* src, allocator_protocol* allocator);
 static inline void*               c_ap_realloc(void* src, size_t new_size, allocator_protocol* allocator);
 static inline bool                c_ap_is_allocator_buf(const void* ptr);
@@ -192,10 +192,6 @@ static inline allocator_protocol* c_ap_allocator_protocol_new(size_t size, shm_a
 static inline void c_ap_allocator_protocol_free(allocator_protocol* protocol) {
     if (!protocol) return;
 
-    // Fire FREE before the magic is invalidated so observers can still
-    // derive a valid protocol from buf during dispatch.
-    c_ap_invoke_callbacks(protocol, AP_CALLBACK_EVENT_FREE);
-
     // Free leftover callback nodes (calloc/free — NOT allocator-protocol data).
     ap_callback_ctx* cb = protocol->callbacks;
     while (cb) {
@@ -232,20 +228,6 @@ static inline void c_ap_allocator_protocol_free(allocator_protocol* protocol) {
     else {
         free((void*) protocol);
     }
-}
-
-static inline int64_t c_ap_allocator_protocol_acquire_owner(allocator_protocol* protocol) {
-    if (!protocol) return 0;
-    int64_t ref_count = atomic_fetch_add_explicit(&protocol->ref_count, 1, memory_order_acq_rel) + 1;
-    c_ap_invoke_callbacks(protocol, AP_CALLBACK_EVENT_ACQUIRE_OWNERSHIP);
-    return ref_count;
-}
-
-static inline int64_t c_ap_allocator_protocol_release_owner(allocator_protocol* protocol) {
-    if (!protocol) return 0;
-    int64_t ref_count = atomic_fetch_sub_explicit(&protocol->ref_count, 1, memory_order_acq_rel) - 1;
-    c_ap_invoke_callbacks(protocol, AP_CALLBACK_EVENT_RELEASE_OWNERSHIP);
-    return ref_count;
 }
 
 static inline void c_ap_invoke_callbacks(allocator_protocol* protocol, ap_callback_event event) {
@@ -338,6 +320,8 @@ static inline void c_ap_free(void* ptr) {
     if (!ptr) return;
     allocator_protocol* protocol = c_ap_protocol_from_ptr(ptr);
 
+    c_ap_invoke_callbacks(protocol, AP_CALLBACK_EVENT_FREE);
+
 #if AP_ALLOC_VIGILANT > 0
     if (protocol->magic != AP_ALLOC_MAGIC) {
         if (protocol->magic == AP_DEALLOC_MAGIC) {
@@ -367,7 +351,7 @@ static inline void c_ap_free(void* ptr) {
 static inline void c_ap_incref(void* ptr) {
     if (!ptr) return;
     allocator_protocol* protocol = c_ap_protocol_from_ptr(ptr);
-    int64_t             ref_count = c_ap_allocator_protocol_acquire_owner(protocol);
+    int64_t             ref_count = atomic_fetch_add_explicit(&protocol->ref_count, 1, memory_order_acq_rel) + 1;
 
 #if AP_ALLOC_VIGILANT > 0
     if (ref_count <= 1) {
@@ -383,7 +367,7 @@ static inline void c_ap_incref(void* ptr) {
 static inline void c_ap_decref(void* ptr) {
     if (!ptr) return;
     allocator_protocol* protocol = c_ap_protocol_from_ptr(ptr);
-    int64_t             ref_count = c_ap_allocator_protocol_release_owner(protocol);
+    int64_t             ref_count = atomic_fetch_sub_explicit(&protocol->ref_count, 1, memory_order_acq_rel) - 1;
 
 #if AP_ALLOC_VIGILANT > 0
     if (ref_count < 0) {
@@ -406,6 +390,22 @@ static inline void c_ap_decref(void* ptr) {
         c_ap_allocator_protocol_free(protocol);
     }
 #endif
+}
+
+static inline int64_t c_ap_acquire_ownership(allocator_protocol* protocol) {
+    // Dummy for now
+    if (!protocol) return 0;
+    int64_t ref_count = atomic_fetch_add_explicit(&protocol->ref_count, 1, memory_order_acq_rel) + 1;
+    c_ap_invoke_callbacks(protocol, AP_CALLBACK_EVENT_ACQUIRE_OWNERSHIP);
+    return ref_count;
+}
+
+static inline int64_t c_ap_release_ownership(allocator_protocol* protocol) {
+    // Dummy for now
+    if (!protocol) return 0;
+    int64_t ref_count = atomic_fetch_sub_explicit(&protocol->ref_count, 1, memory_order_acq_rel) - 1;
+    c_ap_invoke_callbacks(protocol, AP_CALLBACK_EVENT_RELEASE_OWNERSHIP);
+    return ref_count;
 }
 
 static inline char* c_ap_strdup(const char* src, allocator_protocol* allocator) {

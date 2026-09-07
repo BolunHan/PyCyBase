@@ -8,8 +8,8 @@ from .c_allocator_protocol cimport (
 
     c_ap_allocator_protocol_new,
     c_ap_allocator_protocol_free,
-    c_ap_allocator_protocol_acquire_owner,
-    c_ap_allocator_protocol_release_owner,
+    c_ap_acquire_ownership,
+    c_ap_release_ownership,
 
     c_ap_protocol_from_ptr,
     c_ap_alloc,

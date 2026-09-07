@@ -114,19 +114,19 @@ cdef class AllocatorProtocol:
             self.protocol = c_ap_allocator_protocol_new(size, NULL, NULL, 0)
 
         if self.protocol:
-            c_ap_allocator_protocol_acquire_owner(self.protocol)
+            c_ap_acquire_ownership(self.protocol)
 
     def __dealloc__(self):
         if self.protocol:
-            if c_ap_allocator_protocol_release_owner(self.protocol) == 0:
-                c_ap_allocator_protocol_free(self.protocol)
+            if c_ap_release_ownership(self.protocol) == 0:
+                c_ap_free(self.protocol)
 
     @staticmethod
     cdef AllocatorProtocol c_from_protocol(allocator_protocol* protocol):
         cdef AllocatorProtocol instance = AllocatorProtocol.__new__(AllocatorProtocol, 0)
         instance.protocol = protocol
         if protocol != NULL:
-            c_ap_allocator_protocol_acquire_owner(protocol)
+            c_ap_acquire_ownership(protocol)
         return instance
 
     def __repr__(self):

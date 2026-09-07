@@ -57,8 +57,6 @@ cdef extern from "cbase/allocator_protocol/c_allocator_protocol.h":
 
     allocator_protocol* c_ap_allocator_protocol_new(size_t size, shm_allocator_ctx_t* shm_allocator, heap_allocator_t* heap_allocator, c_bool with_lock) noexcept nogil
     void c_ap_allocator_protocol_free(allocator_protocol* protocol) noexcept nogil
-    int64_t c_ap_allocator_protocol_acquire_owner(allocator_protocol* protocol) noexcept nogil
-    int64_t c_ap_allocator_protocol_release_owner(allocator_protocol* protocol) noexcept nogil
     void c_ap_invoke_callbacks(allocator_protocol* protocol, ap_callback_event event) noexcept nogil
 
     allocator_protocol* c_ap_protocol_from_ptr(const void* ptr) noexcept nogil
@@ -66,6 +64,8 @@ cdef extern from "cbase/allocator_protocol/c_allocator_protocol.h":
     void c_ap_free(void* ptr) noexcept nogil
     void c_ap_incref(void* ptr) noexcept nogil
     void c_ap_decref(void* ptr) noexcept nogil
+    int64_t c_ap_acquire_ownership(allocator_protocol* protocol) noexcept nogil
+    int64_t c_ap_release_ownership(allocator_protocol* protocol) noexcept nogil
     char* c_ap_strdup(const char* src, allocator_protocol* allocator) noexcept nogil
     void* c_ap_realloc(void* src, size_t new_size, allocator_protocol* allocator) noexcept nogil
     c_bool c_ap_is_allocator_buf(const void* ptr) noexcept nogil
