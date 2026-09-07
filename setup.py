@@ -19,7 +19,8 @@ PACKAGE_NAME = "cbase"
 DISPLAY_NAME = "PyCyBase"
 
 WITH_ANNOTATION = False
-COMPILE_FLAGS = ["/Ox", "/std:c17", "/experimental:c11atomics"] if platform.system() == "Windows" else ['-O3'] + ([] if os.environ.get('GITHUB_ACTIONS') == 'true' else ['-march=native'])
+NO_MARCH_NATIVE = os.environ.get('GITHUB_ACTIONS') == 'true' or os.environ.get('GITLAB_CI') == 'true'
+COMPILE_FLAGS = ["/Ox", "/std:c17", "/experimental:c11atomics"] if platform.system() == "Windows" else ['-O3'] + ([] if NO_MARCH_NATIVE else ['-march=native'])
 REPO_ROOT = os.path.abspath(os.path.dirname(__file__))
 N_CORES = os.cpu_count() or 1
 N_THREADS = 0 if platform.system() == "Windows" else max(1, N_CORES - 2)
