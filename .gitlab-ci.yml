@@ -87,7 +87,7 @@ pages:
     - pip install -U . --no-build-isolation
     - pip install sphinx furo sphinx-autodoc-typehints
     - cd docs && sphinx-build -M html . _build
-    - mv docs/_build/html public
+    - cd .. && mv docs/_build/html public
   artifacts:
     paths: [public]
 
