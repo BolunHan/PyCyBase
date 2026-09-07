@@ -320,6 +320,7 @@ static inline void c_ap_free(void* ptr) {
     if (!ptr) return;
     allocator_protocol* protocol = c_ap_protocol_from_ptr(ptr);
 
+    c_ap_invoke_callbacks(protocol, AP_CALLBACK_EVENT_DEALLOC);
     c_ap_invoke_callbacks(protocol, AP_CALLBACK_EVENT_FREE);
 
 #if AP_ALLOC_VIGILANT > 0

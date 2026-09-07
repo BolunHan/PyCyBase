@@ -119,7 +119,7 @@ cdef class AllocatorProtocol:
     def __dealloc__(self):
         if self.protocol:
             if c_ap_release_ownership(self.protocol) == 0:
-                c_ap_free(self.protocol)
+                c_ap_free(self.protocol.buf)
 
     @staticmethod
     cdef AllocatorProtocol c_from_protocol(allocator_protocol* protocol):
