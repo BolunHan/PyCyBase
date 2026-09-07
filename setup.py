@@ -220,6 +220,12 @@ cython_extension.extend([
         include_dirs=[REPO_ROOT]
     ),
     Extension(
+        name="cbase.allocator_protocol.c_dual_interface",
+        sources=["cbase/allocator_protocol/c_dual_interface.pyx"],
+        extra_compile_args=COMPILE_FLAGS,
+        include_dirs=[REPO_ROOT]
+    ),
+    Extension(
         name="cbase.bytemap.c_bytemap",
         sources=["cbase/bytemap/c_bytemap.pyx"],
         extra_compile_args=COMPILE_FLAGS,
