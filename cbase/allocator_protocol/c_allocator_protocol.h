@@ -137,8 +137,8 @@ static inline void                c_ap_invoke_callbacks(allocator_protocol* prot
 static inline allocator_protocol* c_ap_protocol_from_ptr(const void* ptr);
 static inline void*               c_ap_alloc(size_t size, allocator_protocol* schematic);
 static inline void                c_ap_free(void* ptr);
-static inline void                c_ap_incref(void* ptr);
-static inline void                c_ap_decref(void* ptr);
+static inline void                c_ap_incref(const void* ptr);
+static inline void                c_ap_decref(const void* ptr);
 static inline int64_t             c_ap_acquire_ownership(allocator_protocol* protocol);
 static inline int64_t             c_ap_release_ownership(allocator_protocol* protocol);
 static inline char*               c_ap_strdup(const char* src, allocator_protocol* allocator);
@@ -349,7 +349,7 @@ static inline void c_ap_free(void* ptr) {
     c_ap_allocator_protocol_free(protocol);
 }
 
-static inline void c_ap_incref(void* ptr) {
+static inline void c_ap_incref(const void* ptr) {
     if (!ptr) return;
     allocator_protocol* protocol = c_ap_protocol_from_ptr(ptr);
     int64_t             ref_count = atomic_fetch_add_explicit(&protocol->ref_count, 1, memory_order_acq_rel) + 1;
@@ -365,7 +365,7 @@ static inline void c_ap_incref(void* ptr) {
     c_ap_invoke_callbacks(protocol, AP_CALLBACK_EVENT_INCREF);
 }
 
-static inline void c_ap_decref(void* ptr) {
+static inline void c_ap_decref(const void* ptr) {
     if (!ptr) return;
     allocator_protocol* protocol = c_ap_protocol_from_ptr(ptr);
     int64_t             ref_count = atomic_fetch_sub_explicit(&protocol->ref_count, 1, memory_order_acq_rel) - 1;

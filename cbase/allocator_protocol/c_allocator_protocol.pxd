@@ -62,8 +62,8 @@ cdef extern from "cbase/allocator_protocol/c_allocator_protocol.h":
     allocator_protocol* c_ap_protocol_from_ptr(const void* ptr) noexcept nogil
     void* c_ap_alloc(size_t size, allocator_protocol* schematic) noexcept nogil
     void c_ap_free(void* ptr) noexcept nogil
-    void c_ap_incref(void* ptr) noexcept nogil
-    void c_ap_decref(void* ptr) noexcept nogil
+    void c_ap_incref(const void* ptr) noexcept nogil
+    void c_ap_decref(const void* ptr) noexcept nogil
     int64_t c_ap_acquire_ownership(allocator_protocol* protocol) noexcept nogil
     int64_t c_ap_release_ownership(allocator_protocol* protocol) noexcept nogil
     char* c_ap_strdup(const char* src, allocator_protocol* allocator) noexcept nogil
