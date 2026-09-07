@@ -47,11 +47,11 @@ test:linux:
     matrix:
       - PYTHON_IMAGE: ["python:3.12", "python:3.13", "python:3.14"]
 
-# Shared Windows runners on GitLab.com use the tag "windows" and their
-# preinstalled Python (adjust the tag for self-managed runners).
+# GitLab.com's shared Windows runner (beta): preinstalled Python, PowerShell
+# shell. Adjust the tag for self-managed runners.
 test:windows:
   extends: .test
-  tags: [windows]
+  tags: [saas-windows-medium-amd64]
 
 # ----------------------------------------------------------------- Docs ----
 # Mirrors build-page-docs.yml. GitLab's equivalent of GitHub Pages deploy is
@@ -136,7 +136,7 @@ publish:posix:
 
 publish:nt:
   extends: .publish
-  tags: [windows]
+  tags: [saas-windows-medium-amd64]
   variables:
     CIBW_SKIP: "pp*"
     CIBW_BUILD: "cp3*-win_amd64"
