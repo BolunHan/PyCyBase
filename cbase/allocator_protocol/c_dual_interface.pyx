@@ -5,6 +5,11 @@ cdef class CCPType:
     def __dealloc__(self):
         c_ccp_unbind(self)
 
+    property address:
+        def __get__(self):
+            if not self.ap_header:
+                return 'NULL'
+            return f'{<uintptr_t> self.ap_header.buf:#0x}'
 
 
 cdef class CCPDoubleArray(CCPType):
@@ -38,6 +43,8 @@ cdef class CCPDoubleArray(CCPType):
 
     property values:
         def __get__(self):
+            if not self.header:
+                return None
             cdef size_t i
             cdef list out = []
             for i in range(self.size):

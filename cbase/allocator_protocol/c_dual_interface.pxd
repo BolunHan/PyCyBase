@@ -19,6 +19,7 @@ cdef extern from "cbase/allocator_protocol/c_dual_interface.h":
     void c_ccp_bound_callback_adaptor(ap_callback_event event, void* buf, void* user_data) noexcept nogil
 
     int c_ccp_bind(object py_object) noexcept nogil
+    int c_ccp_bind_embedded(PyObject* py_object, const void* parent_header) noexcept nogil
     int c_ccp_unbind(object py_object) noexcept nogil
 
 

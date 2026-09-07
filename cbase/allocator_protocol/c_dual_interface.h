@@ -18,7 +18,7 @@ typedef struct ccp_bound_pyclass {
     ccp_protocol_pyclass ccp_protocol;
     void*                pyx_vtab;
     void*                header;
-    int                  owner;
+    int                  owner;  // Optional owner field
 } ccp_bound_pyclass;
 
 // ========== Forward Declaration ==========
@@ -27,6 +27,7 @@ static inline void c_ccp_bound_callback_adaptor(ap_callback_event event, void* b
 
 static inline int  c_ccp_bind(PyObject* py_object);
 static inline int  c_ccp_unbind(PyObject* py_object);
+static inline int c_ccp_bind_embedded(PyObject* py_object, const void* parent_header);
 
 // ========== Utilities Functions ==========
 
@@ -48,6 +49,16 @@ static inline int c_ccp_bind(PyObject* py_object) {
     if (ret_code != AP_OK) return ret_code;
     bound_pyclass->ccp_protocol.ap_header = allocator_protocol;
     c_ap_incref(header);
+    return AP_OK;
+}
+
+static inline int c_ccp_bind_embedded(PyObject* py_object, const void* parent_header) {
+    ccp_bound_pyclass*  bound_pyclass = (ccp_bound_pyclass*) py_object;
+    allocator_protocol* allocator_protocol = c_ap_protocol_from_ptr(parent_header);
+    int                 ret_code = c_ap_register_callback(allocator_protocol, c_ccp_bound_callback_adaptor, py_object, &bound_pyclass->ccp_protocol.ap_binding_id);
+    if (ret_code != AP_OK) return ret_code;
+    bound_pyclass->ccp_protocol.ap_header = allocator_protocol;
+    c_ap_incref(parent_header);
     return AP_OK;
 }
 
