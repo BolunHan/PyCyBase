@@ -37,11 +37,15 @@ cdef class CCPType:
     cdef void ccp_unbind(self)
 
 
-cdef class CCPDoubleArray(CCPType):
-    cdef double* header
+cdef class CCPBoundBuffer(CCPType):
+    cdef char* header
     cdef bint owner
 
     cdef readonly size_t size
 
     @staticmethod
-    cdef CCPDoubleArray c_from_header(double* header, bint owner=?)
+    cdef CCPBoundBuffer c_from_header(char* header, bint owner=?)
+
+
+cdef class CCPDualInterfaceTestToolkit:
+    pass
