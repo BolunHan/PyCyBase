@@ -33,9 +33,8 @@ static inline int  c_ccp_unbind(PyObject* py_object);
 static inline void c_ccp_bound_callback_adaptor(ap_callback_event event, void* buf, void* user_data) {
     if (event == AP_CALLBACK_EVENT_DEALLOC) {
         ccp_bound_pyclass* bound_class = (ccp_bound_pyclass*) user_data;
+        if (bound_class->ccp_protocol.ap_header) c_ccp_unbind((PyObject*) bound_class);
         bound_class->header = NULL;
-        // For view-only wrapper, the owner field might not even exist, only update safe property
-        // bound_class->owner = false;
     }
 }
 

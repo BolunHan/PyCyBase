@@ -42,6 +42,7 @@ cdef class CCPDoubleArray(CCPType):
             cdef list out = []
             for i in range(self.size):
                 out.append(self.header[i])
+            return out
 
         def __set__(self, list values):
             cdef size_t i
