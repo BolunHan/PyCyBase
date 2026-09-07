@@ -15,13 +15,6 @@ stages:
   - docs
   - publish
 
-# Temporary diagnostic job.
-probe:
-  stage: test
-  image: alpine:3.20
-  script:
-    - echo probe-ok
-
 # Only create pipelines for main, MRs, version tags, and manual triggers.
 workflow:
   rules:
