@@ -200,6 +200,51 @@ class TestCCPDualInterfaceTestToolkit(unittest.TestCase):
             "del null_view\n"
         )
 
+    def test_10_ccp_dealloc_triggered_on_self_dealloc(self) -> None:
+        """The __ccp_dealloc__ override runs during the DEALLOC pass:
+        CCPBoundBuffer zeroes its size field before the header is nulled."""
+        self._assert_clean_run(
+            "from cbase.allocator_protocol.c_dual_interface import CCPBoundBuffer\n"
+            "buf = CCPBoundBuffer(16)\n"
+            "assert buf.size == 16\n"
+            "buf.self_dealloc()\n"
+            "assert buf.size == 0\n"
+            "assert buf.address == 'NULL'\n"
+            "del buf\n"
+        )
+
+    def test_11_ccp_dealloc_triggered_on_view_invalidation(self) -> None:
+        """Owner free fires the hook on every bound wrapper: the view's
+        size is zeroed together with the owner's."""
+        self._assert_clean_run(
+            "from cbase.allocator_protocol.c_dual_interface import CCPBoundBuffer, CCPDualInterfaceTestToolkit\n"
+            "owner = CCPBoundBuffer(8)\n"
+            "owner.values = b'01234567'\n"
+            "view = CCPDualInterfaceTestToolkit.c_from_header(CCPDualInterfaceTestToolkit.header_addr(owner), False)\n"
+            "CCPDualInterfaceTestToolkit.ccp_bind(view)\n"
+            "assert view.size == 8\n"
+            "owner.self_dealloc()\n"
+            "assert owner.size == 0\n"
+            "assert view.size == 0\n"
+            "assert CCPDualInterfaceTestToolkit.header_addr(view) == 0\n"
+            "del view\n"
+        )
+
+    def test_12_ccp_dealloc_triggered_on_embedded_invalidation(self) -> None:
+        """Embedded wrappers get the hook too: the entry's size is zeroed
+        when the parent block frees."""
+        self._assert_clean_run(
+            "from cbase.allocator_protocol.c_dual_interface import CCPBoundBuffer, CCPDualInterfaceTestToolkit\n"
+            "owner = CCPBoundBuffer(16)\n"
+            "owner.values = b'0123456789'\n"
+            "entry = CCPDualInterfaceTestToolkit.embedded_from(owner, 3)\n"
+            "assert entry.size == 7\n"
+            "owner.self_dealloc()\n"
+            "assert entry.size == 0\n"
+            "assert CCPDualInterfaceTestToolkit.header_addr(entry) == 0\n"
+            "del entry\n"
+        )
+
 
 if __name__ == '__main__':
     unittest.main()
