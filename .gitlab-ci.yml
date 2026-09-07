@@ -58,6 +58,7 @@ test:windows:
 # a job named "pages" publishing a "public/" artifact.
 docs:build:
   stage: docs
+  needs: []
   image: python:3.13
   rules:
     - if: '$CI_COMMIT_TAG'
@@ -73,6 +74,7 @@ docs:build:
 
 pages:
   stage: docs
+  needs: []
   image: python:3.13
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'  # deploy docs on version tags
@@ -94,6 +96,7 @@ pages:
 # builds the platform wheels, then twine uploads them to PyPI.
 .publish:
   stage: publish
+  needs: []
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
     - if: '$CI_PIPELINE_SOURCE == "web"'
