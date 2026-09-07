@@ -7,15 +7,18 @@
 
 // ========== Structs ==========
 
+typedef void (*cpp_extra_dealloc_func)(PyObject* py_opbject);
+
 typedef struct ccp_protocol {
     // === PyObject_HEAD ====
     PyObject_HEAD;
     // === Pyx Virt Table ===
     void* __pyx_vtab;
     // === Allocator Protocol ====
-    allocator_protocol* ap_header;         // C-struct header binding point, the cdef class must ensure the exact binding position `cdef some_c_struct* header`
-    uintptr_t           ap_binding_id;     // C-struct binding ID
-    size_t              ap_header_offset;  // C-header offset from PyObject*
+    allocator_protocol*    ap_header;            // C-struct header binding point, the cdef class must ensure the exact binding position `cdef some_c_struct* header`
+    uintptr_t              ap_binding_id;        // C-struct binding ID
+    size_t                 ap_header_offset;     // C-header offset from PyObject*
+    cpp_extra_dealloc_func cy_extra_dealloc_fn;  // Cy extra dealloc calls, prior to the nullifying of the header field
 } ccp_protocol;
 
 /**
@@ -51,7 +54,10 @@ static inline void c_ccp_bound_callback_adaptor(ap_callback_event event, void* b
         if (ccp->ap_header) {
             c_ccp_unbind((PyObject*) user_data);
         }
+
         if (header_offset) {
+            cpp_extra_dealloc_func cy_extra_dealloc_fn = ccp->cy_extra_dealloc_fn;
+            if (cy_extra_dealloc_fn) cy_extra_dealloc_fn((PyObject*) user_data);
             void** c_header = (void**) ((char*) user_data + header_offset);
             *c_header = NULL;
         }

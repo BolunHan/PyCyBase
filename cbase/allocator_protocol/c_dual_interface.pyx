@@ -8,18 +8,23 @@ cdef class CCPType:
     def __dealloc__(self):
         self.ccp_unbind()
 
+    cdef void __ccp_dealloc__(self):
+        pass
+
     cdef void ccp_bind(self, void* c_header):
         """signature as void* c_header as intended, only in this way the cython can skip the otherwise enforced type check."""
         cdef int ret_code = c_ccp_bind(<PyObject*> self, <const void**> c_header)
-        if ret_code == ap_ret_code.AP_OK:
-            return
-        raise BufferError(f'[CCP] Failed to bind <{self.__class__.__name__}> to allocator_protocol* {<uintptr_t> self.ap_header:#0x}')
+        if ret_code != ap_ret_code.AP_OK:
+            raise BufferError(f'[CCP] Failed to bind <{self.__class__.__name__}> to allocator_protocol* {<uintptr_t> self.ap_header:#0x}')
+        if <void*> self.__ccp_dealloc__ != <void*> CCPType.__ccp_dealloc__:
+            self.cy_extra_dealloc_fn = <void*> self.__ccp_dealloc__
 
     cdef void ccp_bind_embedded(self, void* c_header, const void* parent_header):
         cdef int ret_code = c_ccp_bind_embedded(<PyObject*> self, <const void**> c_header, parent_header)
-        if ret_code == ap_ret_code.AP_OK:
-            return
-        raise BufferError(f'[CCP] Failed to bind embedded <{self.__class__.__name__}> to allocator_protocol* {<uintptr_t> self.ap_header:#0x}')
+        if ret_code != ap_ret_code.AP_OK:
+            raise BufferError(f'[CCP] Failed to bind embedded <{self.__class__.__name__}> to allocator_protocol* {<uintptr_t> self.ap_header:#0x}')
+        if <void*> self.__ccp_dealloc__ != <void*> CCPType.__ccp_dealloc__:
+            self.cy_extra_dealloc_fn = <void*> self.__ccp_dealloc__
 
     cdef void ccp_unbind(self):
         cdef int ret_code = c_ccp_unbind(<PyObject*> self)
@@ -43,6 +48,9 @@ cdef class CCPBoundBuffer(CCPType):
         self.size = size
         self.owner = True
         self.ccp_bind(&self.header)
+
+    cdef void __ccp_dealloc__(self):
+        self.size = 0
 
     def __dealloc__(self):
         if not self.owner:

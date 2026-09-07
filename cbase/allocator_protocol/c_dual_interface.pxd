@@ -5,12 +5,15 @@ from .c_allocator_protocol cimport allocator_protocol, ap_callback_event
 
 
 cdef extern from "cbase/allocator_protocol/c_dual_interface.h":
+    ctypedef void (*cpp_extra_dealloc_func)(PyObject* py_opbject) noexcept
+
     ctypedef struct ccp_protocol:
         PyObject ob_base
         void* pyx_vtab
         allocator_protocol* ap_header
         uintptr_t ap_binding_id
         size_t ap_header_offset
+        cpp_extra_dealloc_func cy_extra_dealloc_fn
 
     ctypedef struct ccp_bound_pyclass:
         ccp_protocol ccp_ctx
@@ -29,6 +32,9 @@ cdef class CCPType:
     cdef allocator_protocol* ap_header
     cdef uintptr_t ap_binding_id
     cdef size_t ap_header_offset
+    cdef void* cy_extra_dealloc_fn
+
+    cdef void __ccp_dealloc__(self)
 
     cdef void ccp_bind(self, void* c_header)
 
