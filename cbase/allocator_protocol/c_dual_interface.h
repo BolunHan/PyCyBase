@@ -47,7 +47,7 @@ static inline int  c_ccp_unbind(PyObject* py_object);
 // ========== Utilities Functions ==========
 
 static inline void c_ccp_bound_callback_adaptor(ap_callback_event event, void* buf, void* user_data) {
-    if (event == AP_CALLBACK_EVENT_DEALLOC) {
+    if (event == AP_CALLBACK_EVENT_FREE) {
         ccp_protocol* ccp = (ccp_protocol*) user_data;
         // Snapshot the offset before unbind clears the binding state.
         size_t header_offset = ccp->ap_header_offset;

@@ -1,7 +1,7 @@
 from cpython.bytes cimport PyBytes_FromStringAndSize, PyBytes_Size
-from libc.string cimport strlen, memcpy, memset
+from libc.string cimport memcpy, memset, strlen
 
-from .c_allocator_protocol cimport AP_DEFAULT_ALLOCATOR, ap_ret_code, c_ap_alloc, c_ap_free
+from .c_allocator_protocol cimport AP_DEFAULT_ALLOCATOR, ap_ret_code, c_ap_acquire_ownership, c_ap_alloc, c_ap_alloc_child, c_ap_free, c_ap_free_owned, c_ap_parent_of, c_ap_protocol_from_ptr, c_ap_realloc
 
 
 cdef class CCPType:
@@ -57,7 +57,7 @@ cdef class CCPBoundBuffer(CCPType):
             return
 
         if self.header:
-            c_ap_free(self.header)
+            c_ap_free_owned(self.header)
 
     @staticmethod
     cdef CCPBoundBuffer c_from_header(char* header, bint owner=False):
@@ -71,8 +71,34 @@ cdef class CCPBoundBuffer(CCPType):
         return instance
 
     def self_dealloc(self):
-        c_ap_free(self.header)
+        c_ap_free_owned(self.header)
         return self
+
+    cdef CCPBoundBuffer c_alloc_child(self, size_t size):
+        if not self.header:
+            raise BufferError('parent buffer was released')
+
+        cdef char* child = <char*> c_ap_alloc_child(size, NULL, self.header)
+        if child == NULL:
+            raise MemoryError(f'Failed to allocate child buffer of size {size}.')
+
+        cdef CCPBoundBuffer instance = CCPBoundBuffer.__new__(CCPBoundBuffer)
+        instance.header = child
+        instance.owner = True
+        instance.size = size
+        instance.ccp_bind(&instance.header)
+        return instance
+
+    def alloc_child(self, size_t size):
+        return self.c_alloc_child(size)
+
+    cdef void c_free_owned(self):
+        if not self.header:
+            return
+        c_ap_free_owned(self.header)
+
+    def free_owned(self):
+        self.c_free_owned()
 
     property values:
         def __get__(self):
@@ -131,3 +157,68 @@ cdef class CCPDualInterfaceTestToolkit:
     @staticmethod
     def header_addr(CCPBoundBuffer array):
         return <uintptr_t> array.header
+
+    @staticmethod
+    def alloc_child(CCPBoundBuffer parent, size_t size):
+        return parent.c_alloc_child(size)
+
+    @staticmethod
+    def free_owned(CCPBoundBuffer array):
+        array.c_free_owned()
+
+    @staticmethod
+    def realloc_owned(CCPBoundBuffer array, size_t new_size):
+        if not array.header:
+            raise BufferError('buffer was released')
+
+        cdef allocator_protocol* allocator = c_ap_protocol_from_ptr(array.header)
+        cdef char* old_header = array.header
+        cdef char* new_header = <char*> c_ap_realloc(array.header, new_size, allocator)
+        if new_header == NULL:
+            array.header = NULL
+            array.size = 0
+            raise MemoryError(f'Failed to reallocate buffer to size {new_size}.')
+
+        if new_header == old_header:
+            # In-place shrink: the block (and its wrapper) is unchanged.
+            array.size = new_size
+            return array
+
+        # Moved: the old block's FREE pass husked `array` when it was
+        # bound; null it unconditionally so unbound wrappers never dangle.
+        array.header = NULL
+        array.size = 0
+
+        cdef CCPBoundBuffer instance = CCPBoundBuffer.__new__(CCPBoundBuffer)
+        instance.header = new_header
+        instance.owner = True
+        instance.size = new_size
+        instance.ccp_bind(&instance.header)
+        return instance
+
+    @staticmethod
+    def hierarchy_addr(CCPBoundBuffer array):
+        if not array.header:
+            raise BufferError('buffer was released')
+
+        cdef allocator_protocol* protocol = c_ap_protocol_from_ptr(array.header)
+        # c_ap_parent_of returns the parent block start — derive its protocol
+        # so all four slots report protocol addresses.
+        return (<uintptr_t> c_ap_protocol_from_ptr(c_ap_parent_of(array.header)), <uintptr_t> protocol.first_child,
+                <uintptr_t> protocol.next_sibling, <uintptr_t> protocol.prev_sibling)
+
+    @staticmethod
+    def acquire_ownership(CCPBoundBuffer array, uintptr_t new_parent_addr=0):
+        if not array.header:
+            raise BufferError('buffer was released')
+        c_ap_acquire_ownership(array.header, <const void*> new_parent_addr)
+
+    @staticmethod
+    def protocol_addr(CCPBoundBuffer array):
+        if not array.header:
+            raise BufferError('buffer was released')
+        return <uintptr_t> c_ap_protocol_from_ptr(array.header)
+
+    @staticmethod
+    def raw_free(CCPBoundBuffer array):
+        c_ap_free(array.header)

@@ -52,6 +52,10 @@ cdef class CCPBoundBuffer(CCPType):
     @staticmethod
     cdef CCPBoundBuffer c_from_header(char* header, bint owner=?)
 
+    cdef CCPBoundBuffer c_alloc_child(self, size_t size)
+
+    cdef void c_free_owned(self)
+
 
 cdef class CCPDualInterfaceTestToolkit:
     pass

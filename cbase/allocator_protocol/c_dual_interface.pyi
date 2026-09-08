@@ -7,7 +7,7 @@ class CCPType:
     Inheriting this class registers a wrapper with the underlying buffer's
     allocator protocol via ``ccp_bind`` / ``ccp_bind_embedded``, so the
     wrapper is automatically unbound and invalidated when the buffer is
-    freed (the DEALLOC pass). Subclasses must call ``ccp_bind`` after every
+    freed (the FREE pass). Subclasses must call ``ccp_bind`` after every
     ``_new``-like init and ``ccp_bind`` / ``ccp_bind_embedded`` after every
     ``c_from_header``-like adoption.
 
@@ -59,6 +59,33 @@ class CCPBoundBuffer(CCPType):
         Returns:
             The instance itself; afterwards the wrapper is unbound, its
             ``header`` is NULL and ``size`` is zeroed.
+        """
+        ...
+
+    def alloc_child(self, size: int) -> CCPBoundBuffer:
+        """Allocate a child block owned by this buffer.
+
+        The child is an owned, bound buffer linked into this buffer's
+        ownership tree; freeing this buffer with ``free_owned`` recursively
+        frees the child (invalidating its wrapper).
+
+        Args:
+            size: Child buffer size in bytes.
+
+        Returns:
+            The new child buffer.
+
+        Raises:
+            BufferError: If this buffer was released.
+            MemoryError: If the allocation failed.
+        """
+        ...
+
+    def free_owned(self) -> None:
+        """Free this buffer together with the whole ownership tree below it.
+
+        Every bound wrapper of the tree is invalidated: ``header`` becomes
+        NULL and ``size`` is zeroed. Idempotent on a released buffer.
         """
         ...
 
@@ -163,5 +190,120 @@ class CCPDualInterfaceTestToolkit:
 
         Returns:
             The header pointer as an integer, 0 when NULL.
+        """
+        ...
+
+    @staticmethod
+    def alloc_child(parent: CCPBoundBuffer, size: int) -> CCPBoundBuffer:
+        """Allocate a child block owned by ``parent``.
+
+        Args:
+            parent: The parent buffer.
+            size: Child buffer size in bytes.
+
+        Returns:
+            The new bound, owned child buffer.
+
+        Raises:
+            BufferError: If ``parent`` was released.
+            MemoryError: If the allocation failed.
+        """
+        ...
+
+    @staticmethod
+    def free_owned(array: CCPBoundBuffer) -> None:
+        """Free ``array`` together with its whole ownership tree.
+
+        Args:
+            array: The buffer to free recursively.
+        """
+        ...
+
+    @staticmethod
+    def realloc_owned(array: CCPBoundBuffer, new_size: int) -> CCPBoundBuffer:
+        """Reallocate a buffer — grows move the block, shrinks stay in place.
+
+        Grow: ``array`` is invalidated in place (header NULL, size 0) and the
+        returned wrapper owns the moved block carrying the same hierarchy.
+        Shrink: the block is not recycled — only the header size changes,
+        the SAME wrapper is returned (and a warning is logged).
+        ``new_size == 0`` logs an error and aborts.
+
+        Args:
+            array: The buffer to reallocate (must be a block start).
+            new_size: New buffer size in bytes (must be > 0).
+
+        Returns:
+            The wrapper of the (possibly moved) block — ``array`` itself on
+            shrink.
+
+        Raises:
+            BufferError: If ``array`` was released.
+            MemoryError: If the reallocation failed.
+        """
+        ...
+
+    @staticmethod
+    def hierarchy_addr(array: CCPBoundBuffer) -> tuple[int, int, int, int]:
+        """The ownership tree pointers of a block-start buffer.
+
+        Args:
+            array: The buffer to inspect (must be a block start).
+
+        Returns:
+            A ``(parent, first_child, next_sibling, prev_sibling)`` tuple of
+            raw protocol addresses; 0 means NULL. The parent slot is 0 for
+            roots.
+
+        Raises:
+            BufferError: If ``array`` was released.
+        """
+        ...
+
+    @staticmethod
+    def protocol_addr(array: CCPBoundBuffer) -> int:
+        """The raw protocol header address of a block-start buffer.
+
+        Args:
+            array: The buffer to inspect (must be a block start).
+
+        Returns:
+            The allocator protocol address as an integer.
+
+        Raises:
+            BufferError: If ``array`` was released.
+        """
+        ...
+
+    @staticmethod
+    def raw_free(array: CCPBoundBuffer) -> None:
+        """Call ``c_ap_free`` directly, bypassing ``free_owned``.
+
+        Test-only: freeing a buffer that still owns children with this
+        aborts under ``AP_ALLOC_VIGILANT``.
+
+        Args:
+            array: The buffer to free non-recursively.
+        """
+        ...
+
+    @staticmethod
+    def acquire_ownership(array: CCPBoundBuffer, new_parent_addr: int = 0) -> None:
+        """Acquire ownership of a buffer — detach it or re-parent it.
+
+        With ``new_parent_addr == 0`` the buffer (together with its own
+        children) is detached from its tree and becomes an independent
+        root; idempotent on roots. With a parent address given, the buffer
+        and its subtree are moved under the new parent (pushed at the head
+        of its child list). The refcount is not touched.
+
+        Args:
+            array: The buffer to acquire (must be a block start).
+            new_parent_addr: Raw header address of the new parent buffer;
+                0 detaches instead. A buffer cannot be parented under
+                itself or its own descendant (VIGILANT abort).
+
+        Raises:
+            BufferError: If ``array`` was released.
         """
         ...
