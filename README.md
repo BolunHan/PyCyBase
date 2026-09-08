@@ -1,10 +1,10 @@
 # PyCyBase
 
-[![tests](https://github.com/BolunHan/PyCyBase/actions/workflows/tests.yml/badge.svg)](https://github.com/BolunHan/PyCyBase/actions/workflows/tests.yml)
-[![docs](https://github.com/BolunHan/PyCyBase/actions/workflows/build-page-docs.yml/badge.svg)](https://github.com/BolunHan/PyCyBase/actions/workflows/build-page-docs.yml)
-[![pypi-linux](https://github.com/BolunHan/PyCyBase/actions/workflows/publish-posix-to-pypi.yml/badge.svg)](https://github.com/BolunHan/PyCyBase/actions/workflows/publish-posix-to-pypi.yml)
-[![pypi-windows](https://github.com/BolunHan/PyCyBase/actions/workflows/publish-nt-to-pypi.yml/badge.svg)](https://github.com/BolunHan/PyCyBase/actions/workflows/publish-nt-to-pypi.yml)
 [![gitlab](https://gitlab.com/BolunHan/PyCyBase/badges/main/pipeline.svg)](https://gitlab.com/BolunHan/PyCyBase/-/pipelines)
+
+> **GitHub Actions: ⛔ temporarily disabled** — kept disabled until the
+> GitHub Actions issue is resolved. See `.github/workflows/README.md`.
+> CI runs on the GitLab mirror pipeline while disabled.
 
 Common C / Cython dual interfaces for Python HFT Projects.
 

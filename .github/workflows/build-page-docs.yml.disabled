@@ -1,3 +1,9 @@
+# ============================================================================
+# DISABLED (temporary) — do NOT re-enable.
+# GitHub Actions workflows are disabled for this repository until the
+# GitHub Actions issue is resolved. See .github/workflows/README.md.
+# Re-enable: git mv .github/workflows/build-page-docs.yml.disabled .github/workflows/build-page-docs.yml
+# ============================================================================
 name: Documentation
 
 on:
