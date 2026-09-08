@@ -4,7 +4,7 @@ import unittest
 
 
 class TestCCPBoundBufferLifecycle(unittest.TestCase):
-    """Contract: c_ap_free on a bound buffer fires AP_CALLBACK_EVENT_DEALLOC
+    """Contract: c_ap_free on a bound buffer fires AP_CALLBACK_EVENT_FREE
     first, so every bound wrapper releases its reference (ref_count drops to
     the allocation's own) and the free completes gracefully instead of
     tripping the AP_ALLOC_VIGILANT shared-buffer abort.

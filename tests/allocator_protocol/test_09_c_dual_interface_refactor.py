@@ -60,7 +60,7 @@ class TestCCPDualInterfaceTestToolkit(unittest.TestCase):
         )
 
     def test_01_self_dealloc_unbinds_and_frees(self) -> None:
-        """self_dealloc() fires DEALLOC, the adaptor releases the binding
+        """self_dealloc() fires FREE, the adaptor releases the binding
         (address becomes 'NULL') and the free completes; a second call is a
         no-op and final GC is silent."""
         self._assert_clean_run(
@@ -201,7 +201,7 @@ class TestCCPDualInterfaceTestToolkit(unittest.TestCase):
         )
 
     def test_10_ccp_dealloc_triggered_on_self_dealloc(self) -> None:
-        """The __ccp_dealloc__ override runs during the DEALLOC pass:
+        """The __ccp_dealloc__ override runs during the FREE pass:
         CCPBoundBuffer zeroes its size field before the header is nulled."""
         self._assert_clean_run(
             "from cbase.allocator_protocol.c_dual_interface import CCPBoundBuffer\n"
