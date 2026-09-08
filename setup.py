@@ -14,7 +14,7 @@ from setuptools.command.build_ext import build_ext
 # Setup Configuration
 # ==============================
 
-BUILD_SCRIPT_VERSION = "0.2.1.post2"
+BUILD_SCRIPT_VERSION = "1.0.0"
 PACKAGE_NAME = "cbase"
 DISPLAY_NAME = "PyCyBase"
 
