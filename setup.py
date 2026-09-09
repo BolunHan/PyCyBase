@@ -23,7 +23,7 @@ NO_MARCH_NATIVE = os.environ.get('GITHUB_ACTIONS') == 'true' or os.environ.get('
 COMPILE_FLAGS = ["/Ox", "/std:c17", "/experimental:c11atomics"] if platform.system() == "Windows" else ['-O3'] + ([] if NO_MARCH_NATIVE else ['-march=native'])
 REPO_ROOT = os.path.abspath(os.path.dirname(__file__))
 N_CORES = os.cpu_count() or 1
-N_THREADS = 0 if platform.system() == "Windows" else max(1, N_CORES - 2)
+N_THREADS = 0 if (platform.system() == "Windows" or NO_MARCH_NATIVE) else max(1, N_CORES - 2)
 __VERSION__ = match.group(1) if (match := re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']', (Path(REPO_ROOT) / PACKAGE_NAME / '__init__.py').read_text(), re.MULTILINE)) else "unknown"
 
 ext_modules = []
