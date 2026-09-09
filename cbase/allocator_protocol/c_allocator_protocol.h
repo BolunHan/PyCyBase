@@ -83,7 +83,7 @@ typedef enum ap_callback_event {
  * @brief Unified callback signature for allocator-protocol events.
  *
  * The callback derives the protocol from buf (c_ap_protocol_from_ptr) to
- * read the current state (ref_count, size, ...). buf is non-const — the
+ * read the current state (ref_count, size, ...). buf is non-const - the
  * callback may update the buffer in place.
  *
  * @param event      Event type.
@@ -122,7 +122,7 @@ typedef struct allocator_protocol {
     uint64_t magic;
 #endif
     _Atomic int64_t            ref_count;
-    struct allocator_protocol* parent;        // Ownership tree — parent block (NULL for roots). NOT refcounted.
+    struct allocator_protocol* parent;        // Ownership tree - parent block (NULL for roots). NOT refcounted.
     struct allocator_protocol* first_child;   // Head of the owned children list (doubly linked, most recent first).
     struct allocator_protocol* next_sibling;  // Next sibling in the parent's child list.
     struct allocator_protocol* prev_sibling;  // Previous sibling in the parent's child list.
@@ -185,7 +185,7 @@ static inline allocator_protocol* c_ap_allocator_protocol_new(size_t size, shm_a
     protocol->size = size;
 #if AP_ALLOC_VIGILANT > 0
     // Contract: every allocation path (calloc / heap request / shm request)
-    // hands out zeroed memory — the ownership fields must already be NULL.
+    // hands out zeroed memory - the ownership fields must already be NULL.
     if (protocol->parent || protocol->first_child || protocol->next_sibling || protocol->prev_sibling) {
         fprintf(stderr, "[AP_ALLOC_VIGILANT] ERROR: freshly allocated protocol header is not zeroed!\n");
         fflush(stderr);
@@ -205,7 +205,7 @@ static inline allocator_protocol* c_ap_allocator_protocol_new(size_t size, shm_a
 static inline void c_ap_allocator_protocol_free(allocator_protocol* protocol) {
     if (!protocol) return;
 
-    // Free leftover callback nodes (calloc/free — NOT allocator-protocol data).
+    // Free leftover callback nodes (calloc/free - NOT allocator-protocol data).
     ap_callback_ctx* cb = protocol->callbacks;
     while (cb) {
         ap_callback_ctx* next = cb->next;
@@ -305,7 +305,7 @@ static inline void* c_ap_alloc(size_t size, allocator_protocol* schematic) {
         if (!clone) return NULL;
         clone->size = size;
 #if AP_ALLOC_VIGILANT > 0
-        // Contract: calloc hands out zeroed memory — the ownership fields
+        // Contract: calloc hands out zeroed memory - the ownership fields
         // must already be NULL.
         if (clone->parent || clone->first_child || clone->next_sibling || clone->prev_sibling) {
             fprintf(stderr, "[AP_ALLOC_VIGILANT] ERROR: freshly allocated protocol header is not zeroed!\n");
@@ -351,7 +351,7 @@ static inline void* c_ap_alloc(size_t size, allocator_protocol* schematic) {
     clone->size = size;
 #if AP_ALLOC_VIGILANT > 0
     // Contract: every allocation path (calloc / heap request / shm request)
-    // hands out zeroed memory — the ownership fields must already be NULL.
+    // hands out zeroed memory - the ownership fields must already be NULL.
     if (clone->parent || clone->first_child || clone->next_sibling || clone->prev_sibling) {
         fprintf(stderr, "[AP_ALLOC_VIGILANT] ERROR: freshly allocated protocol header is not zeroed!\n");
         fflush(stderr);
@@ -370,7 +370,7 @@ static inline void* c_ap_alloc(size_t size, allocator_protocol* schematic) {
  * @brief Allocate a child block owned by a parent block.
  *
  * Links the new block into the parent's doubly-linked child list (pushed
- * at the head — child order is unspecified). Ownership is structural and
+ * at the head - child order is unspecified). Ownership is structural and
  * NOT refcounted: the parent must outlive the child. Free the tree with
  * c_ap_free_owned; freeing a child individually unlinks it automatically.
  *
@@ -401,7 +401,7 @@ static inline void c_ap_free(void* ptr) {
     if (!ptr) return;
     allocator_protocol* protocol = c_ap_protocol_from_ptr(ptr);
 
-    // Lifecycle: FREE only — AP_CALLBACK_EVENT_DEALLOC is preserved but unused.
+    // Lifecycle: FREE only - AP_CALLBACK_EVENT_DEALLOC is preserved but unused.
     c_ap_invoke_callbacks(protocol, AP_CALLBACK_EVENT_FREE);
 
 #if AP_ALLOC_VIGILANT > 0
@@ -450,7 +450,7 @@ static inline void c_ap_free(void* ptr) {
  * Recursively frees every child (and their descendants) depth-first, then
  * unlinks the buffer from its own parent and frees it. NULL-safe and
  * idempotent-safe on already-freed (invalidated) pointers is NOT
- * guaranteed — pass live ap-allocated buffers only. c_ap_free is the
+ * guaranteed - pass live ap-allocated buffers only. c_ap_free is the
  * non-recursive counterpart: it refuses (VIGILANT) to free a buffer that
  * still owns children.
  *
@@ -462,7 +462,7 @@ static inline void c_ap_free_owned(void* ptr) {
 
     allocator_protocol* child = protocol->first_child;
     while (child) {
-        allocator_protocol* next = child->next_sibling;  // Snapshot — the free below rewires the list.
+        allocator_protocol* next = child->next_sibling;  // Snapshot - the free below rewires the list.
         c_ap_free_owned(child->buf);
         child = next;
     }
@@ -511,7 +511,7 @@ static inline void c_ap_decref(const void* ptr) {
 
 #if AP_DECREF_AUTOFREE > 0
     if (ref_count == 0) {
-        // The last reference dropped — the owned tree dies with the block
+        // The last reference dropped - the owned tree dies with the block
         // (c_ap_free_owned takes care of children, which would dangle here).
         c_ap_free_owned(protocol->buf);
     }
@@ -519,11 +519,11 @@ static inline void c_ap_decref(const void* ptr) {
 }
 
 /**
- * @brief Acquire ownership of a block — detach it or re-parent it.
+ * @brief Acquire ownership of a block - detach it or re-parent it.
  *
  * With parent == NULL the block is unlinked from its current tree and
  * becomes an independent root that owns itself (idempotent on roots).
- * With a parent given, the block — together with its whole subtree — is
+ * With a parent given, the block - together with its whole subtree - is
  * moved out of its current tree and linked as a child of the new parent
  * (pushed at the head). A block cannot be parented under itself or its
  * own descendant (VIGILANT). The ref_count is NOT touched.
@@ -580,21 +580,21 @@ static inline char* c_ap_strdup(const char* src, allocator_protocol* allocator) 
 }
 
 /**
- * @brief Reallocate a buffer — in-place on shrink, alloc-copy-migrate on grow.
+ * @brief Reallocate a buffer - in-place on shrink, alloc-copy-migrate on grow.
  *
  * Shrink (new_size <= size): the allocator cannot recycle the tail of a
  * block, so only the header size is updated in place (same pointer
- * returned) and a warning is logged to stderr — shrinking makes no sense
+ * returned) and a warning is logged to stderr - shrinking makes no sense
  * with the allocator protocol.
  *
  * Grow (new_size > size): allocates a fresh block, copies the content, and
- * migrates the hierarchy — children's parent pointers are re-pointed at
- * the new block, and — when the reallocated buffer is itself a child —
+ * migrates the hierarchy - children's parent pointers are re-pointed at
+ * the new block, and - when the reallocated buffer is itself a child -
  * its parent's child list is patched to reference the new block. The old
  * block is detached and freed. As with c_ap_free, a shared (ref_count>1)
  * buffer aborts under VIGILANT.
  *
- * new_size == 0: ambiguous (plain free vs free_owned) — logs and aborts.
+ * new_size == 0: ambiguous (plain free vs free_owned) - logs and aborts.
  *
  * @param src       Buffer to reallocate (NULL behaves like c_ap_alloc).
  * @param new_size  New buffer size in bytes (must be > 0).
@@ -604,14 +604,14 @@ static inline char* c_ap_strdup(const char* src, allocator_protocol* allocator) 
 static inline void* c_ap_realloc(void* src, size_t new_size, allocator_protocol* allocator) {
     if (!src) return c_ap_alloc(new_size, allocator);
     if (new_size == 0) {
-        fprintf(stderr, "[c_ap_realloc] ERROR: realloc to size 0 is ambiguous (plain free vs free_owned) — aborting!\n");
+        fprintf(stderr, "[c_ap_realloc] ERROR: realloc to size 0 is ambiguous (plain free vs free_owned) - aborting!\n");
         fflush(stderr);
         abort();
     }
 
     allocator_protocol* old = c_ap_protocol_from_ptr(src);
 
-    // Shrink in place: the block is not recycled — only the header size changes.
+    // Shrink in place: the block is not recycled - only the header size changes.
     if (new_size <= old->size) {
         fprintf(stderr, "[c_ap_realloc] WARNING: shrinking %zu -> %zu only updates the header size; the block is not recycled!\n", old->size, new_size);
         old->size = new_size;
@@ -666,7 +666,7 @@ static inline bool c_ap_is_allocator_buf(const void* ptr) {
  * @brief Register a callback on an allocator protocol.
  *
  * Callback nodes are allocated with calloc and freed with free (short-lived
- * registration state — NOT allocator-protocol data). Registrations are
+ * registration state - NOT allocator-protocol data). Registrations are
  * process-local: a protocol shared across processes must not be registered
  * by more than one process at a time.
  *

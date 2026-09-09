@@ -271,7 +271,7 @@ static inline int c_shm_scan_page(const char* shm_prefix, char* out);
  *
  * The name format is {prefix}_ac_{pid_hex}[_{suffix}] (allocator) or
  * {prefix}_pg_{pid_hex}_{suffix} (page).  The pid is located via the
- * "_ac_" / "_pg_" marker — it is prefix-agnostic.
+ * "_ac_" / "_pg_" marker - it is prefix-agnostic.
  *
  * @param shm_name SHM object name (with or without leading '/').
  * @return pid on success, -1 with errno=EINVAL on parse failure.
@@ -340,7 +340,7 @@ static inline size_t c_shm_block_bin(size_t capacity) {
     if (capacity <= (size_t) AP_SHM_EXACT_BIN_COUNT * 8u) {
         return capacity >> 3;
     }
-    size_t idx = (size_t) AP_SHM_EXACT_BIN_COUNT + (c_shm_block_ceil_log2(capacity) - 16u);
+    size_t idx = (size_t) AP_SHM_EXACT_BIN_COUNT + (c_shm_block_ceil_log2((uint32_t) capacity) - 16u);
     if (idx > (size_t) AP_SHM_EXACT_BIN_COUNT + AP_SHM_LARGE_BIN_COUNT) {
         idx = (size_t) AP_SHM_EXACT_BIN_COUNT + AP_SHM_LARGE_BIN_COUNT;
     }
@@ -926,7 +926,7 @@ static inline void* c_shm_request(shm_allocator_ctx* ctx, size_t size, int scan_
     }
 
     // Step 1: Size-binned free-list reuse (see c_shm_block_bin).
-    // Exact bins always fit (capacity == cap_net) — O(1) head pop.
+    // Exact bins always fit (capacity == cap_net) - O(1) head pop.
     // Pow2-class bins use in-bin first-fit: bins are short and same-
     // shaped, so the head is the common hit; larger-capacity blocks in
     // the bin also satisfy smaller requests.

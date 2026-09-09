@@ -858,7 +858,7 @@ static inline void* c_bytemap_entry_value(const bytemap_entry* entry) {
 /**
  * @brief Raw unchecked extraction of void* value from an entry.
  *
- * No NULL or occupancy checks — caller must ensure the entry is valid.
+ * No NULL or occupancy checks - caller must ensure the entry is valid.
  * Intended for tight inner loops where safety is guaranteed by context.
  */
 static inline void* c_bytemap_entry_value_as_ptr(const bytemap_entry* entry) {

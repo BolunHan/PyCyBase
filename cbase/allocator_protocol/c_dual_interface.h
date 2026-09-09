@@ -11,7 +11,7 @@ typedef void (*cpp_extra_dealloc_func)(PyObject* py_opbject);
 
 typedef struct ccp_protocol {
     // === PyObject_HEAD ====
-    PyObject_HEAD  // macro already ends with ';' since Python 3.11 — a trailing ';' makes an empty declaration, which MSVC's C frontend rejects (C2059)
+    PyObject_HEAD  // macro already ends with ';' since Python 3.11 - a trailing ';' makes an empty declaration, which MSVC's C frontend rejects (C2059)
     // === Pyx Virt Table ===
     void* __pyx_vtab;
     // === Allocator Protocol ====
@@ -94,7 +94,7 @@ static inline int c_ccp_bind_embedded(PyObject* py_object, const void** c_header
 static inline int c_ccp_unbind(PyObject* py_object) {
     ccp_protocol*       ccp = (ccp_protocol*) py_object;
     allocator_protocol* allocator_protocol = ccp->ap_header;
-    if (!allocator_protocol) return AP_OK;  // Already unbound — idempotent.
+    if (!allocator_protocol) return AP_OK;  // Already unbound - idempotent.
     int ret_code = c_ap_unregister_callback(allocator_protocol, ccp->ap_binding_id);
     if (ret_code != AP_OK) return ret_code;
     ccp->ap_header = NULL;

@@ -238,7 +238,7 @@ static inline size_t c_nt_shm_block_bin(size_t capacity) {
     if (capacity <= (size_t) AP_SHM_EXACT_BIN_COUNT * 8u) {
         return capacity >> 3;
     }
-    size_t idx = (size_t) AP_SHM_EXACT_BIN_COUNT + (c_nt_shm_block_ceil_log2(capacity) - 16u);
+    size_t idx = (size_t) AP_SHM_EXACT_BIN_COUNT + (c_nt_shm_block_ceil_log2((uint32_t) capacity) - 16u);
     if (idx > (size_t) AP_SHM_EXACT_BIN_COUNT + AP_SHM_LARGE_BIN_COUNT) {
         idx = (size_t) AP_SHM_EXACT_BIN_COUNT + AP_SHM_LARGE_BIN_COUNT;
     }
@@ -1007,7 +1007,7 @@ static inline void* c_nt_shm_request(nt_shm_allocator_ctx* ctx, size_t size, int
     }
 
     // Step 1: Size-binned free-list reuse (see c_nt_shm_block_bin).
-    // Exact bins always fit (capacity == cap_net) — O(1) head pop.
+    // Exact bins always fit (capacity == cap_net) - O(1) head pop.
     // Pow2-class bins use in-bin first-fit: bins are short and same-
     // shaped, so the head is the common hit; larger-capacity blocks in
     // the bin also satisfy smaller requests.
