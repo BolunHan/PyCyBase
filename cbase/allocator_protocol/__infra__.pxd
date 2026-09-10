@@ -34,14 +34,18 @@ from .c_allocator_protocol cimport (
 
 from .c_dual_interface cimport (
     cpp_extra_dealloc_func,
-    ccp_protocol, ccp_bound_pyclass,
+    ccp_ctx, ccp_protocol, ccp_bound_pyclass,
 
     c_ccp_bound_callback_adaptor,
+    c_ccp_context_callback_adaptor,
     c_ccp_bind,
     c_ccp_bind_embedded,
     c_ccp_unbind,
+    c_ccp_attach,
+    c_ccp_attach_embedded,
+    c_ccp_detach,
 
-    CCPType, CCPBoundBuffer, CCPDualInterfaceTestToolkit,
+    CCPType, BoundBuffer, CCPAttachedBuffer, CCPBoundBuffer, CCPDualInterfaceTestToolkit,
 )
 
 from .c_heap_allocator cimport (
