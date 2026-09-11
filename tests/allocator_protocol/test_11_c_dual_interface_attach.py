@@ -10,10 +10,11 @@ class TestCCPAttachmentProtocol(unittest.TestCase):
 
     - BoundBuffer is the plain c-dual-interface design: owner flag only, no
       reverse dealloc invalidation (views are raw pointers).
-    - CCPAttachedBuffer(BoundBuffer) embeds ``cdef ccp_ctx ccp_ctx`` and
-      registers every init/adoption via c_attach / c_attach_embedded; the
-      FREE pass detaches the wrapper, runs the armed __ccp_dealloc__ hook
-      (zeroes size), and nulls the header.
+    - CCPAttachedBuffer(BoundBuffer) embeds ``cdef ccp_ctx ccp_ctx``;
+      ccp_attach runs after every init, and the adoption helpers attach
+      INSIDE (c_from_header for block starts, c_from_header_embedded for
+      interior pointers); the FREE pass detaches the wrapper, runs the
+      armed __ccp_dealloc__ hook (zeroes size), and nulls the header.
     - CCPType itself stays bound-only (ccp_bind family).
 
     Expected behavior:
@@ -83,7 +84,6 @@ class TestCCPAttachmentProtocol(unittest.TestCase):
             "owner = BoundBuffer(8)\n"
             "owner.values = b'01234567'\n"
             "view = CCPDualInterfaceTestToolkit.attached_c_from_header(CCPDualInterfaceTestToolkit.buffer_header_addr(owner), False)\n"
-            "CCPDualInterfaceTestToolkit.attached_attach(view)\n"
             "assert view.address != 'NULL'\n"
             "assert view.values == b'01234567'\n"
             "view.values = b'abcdefgh'\n"
@@ -103,7 +103,6 @@ class TestCCPAttachmentProtocol(unittest.TestCase):
             "owner = CCPAttachedBuffer(8)\n"
             "owner.values = b'01234567'\n"
             "view = CCPDualInterfaceTestToolkit.attached_c_from_header(CCPDualInterfaceTestToolkit.attached_header_addr(owner), False)\n"
-            "CCPDualInterfaceTestToolkit.attached_attach(view)\n"
             "assert view.values == b'01234567'\n"
             "owner.free_owned()\n"
             "assert owner.address == 'NULL'\n"
@@ -134,16 +133,15 @@ class TestCCPAttachmentProtocol(unittest.TestCase):
             "del entry\n"
         )
 
-    def test_05_attached_two_step_embedded(self) -> None:
-        """The explicit two-step path — c_from_header on an interior pointer
-        then attached_attach_embedded with the parent block address —
-        works."""
+    def test_05_attached_embedded_adoption_helper(self) -> None:
+        """attached_c_from_header_embedded adopts an interior pointer and
+        attaches embedded inside — no caller-side attach; writes land in
+        the owner."""
         self._assert_clean_run(
             "from cbase.allocator_protocol.c_dual_interface import CCPAttachedBuffer, CCPDualInterfaceTestToolkit\n"
             "owner = CCPAttachedBuffer(8)\n"
             "owner.values = b'01234567'\n"
-            "entry = CCPDualInterfaceTestToolkit.attached_c_from_header(CCPDualInterfaceTestToolkit.attached_header_addr(owner) + 3, False)\n"
-            "CCPDualInterfaceTestToolkit.attached_attach_embedded(entry, CCPDualInterfaceTestToolkit.attached_header_addr(owner))\n"
+            "entry = CCPDualInterfaceTestToolkit.attached_c_from_header_embedded(CCPDualInterfaceTestToolkit.attached_header_addr(owner) + 3, CCPDualInterfaceTestToolkit.attached_header_addr(owner))\n"
             "assert entry.values == b'34567'\n"
             "entry.values = b'zz'\n"
             "assert owner.values == b'012zz' + b'\\x00' * 3\n"
@@ -170,7 +168,7 @@ class TestCCPAttachmentProtocol(unittest.TestCase):
         )
 
     def test_07_manual_detach_releases_binding_only(self) -> None:
-        """attached_detach releases the binding (address 'NULL') but leaves
+        """attached_ccp_detach releases the binding (address 'NULL') but leaves
         the header intact; the owner then frees cleanly and the detached
         wrapper GCs silently."""
         self._assert_clean_run(
@@ -178,9 +176,8 @@ class TestCCPAttachmentProtocol(unittest.TestCase):
             "owner = BoundBuffer(8)\n"
             "owner.values = b'01234567'\n"
             "view = CCPDualInterfaceTestToolkit.attached_c_from_header(CCPDualInterfaceTestToolkit.buffer_header_addr(owner), False)\n"
-            "CCPDualInterfaceTestToolkit.attached_attach(view)\n"
             "assert view.address != 'NULL'\n"
-            "CCPDualInterfaceTestToolkit.attached_detach(view)\n"
+            "CCPDualInterfaceTestToolkit.attached_ccp_detach(view)\n"
             "assert view.address == 'NULL'\n"
             "assert CCPDualInterfaceTestToolkit.attached_header_addr(view) == CCPDualInterfaceTestToolkit.buffer_header_addr(owner)\n"
             "owner.free_owned()\n"
@@ -188,35 +185,30 @@ class TestCCPAttachmentProtocol(unittest.TestCase):
         )
 
     def test_08_unattached_wrappers_dealloc_gracefully(self) -> None:
-        """Wrappers created WITHOUT ccp_attach must still deallocate
-        silently: an unattached view over a live owner, a NULL-header
-        wrapper, and the owner free."""
+        """A __new__-only wrapper (never attached) deallocates silently,
+        and the owner free completes."""
         self._assert_clean_run(
             "import gc\n"
             "from cbase.allocator_protocol.c_dual_interface import BoundBuffer, CCPDualInterfaceTestToolkit\n"
             "owner = BoundBuffer(8)\n"
             "owner.values = b'01234567'\n"
-            "view = CCPDualInterfaceTestToolkit.attached_c_from_header(CCPDualInterfaceTestToolkit.buffer_header_addr(owner), False)\n"
-            "assert view.values == b'01234567'\n"
-            "assert view.address == 'NULL'\n"
-            "del view\n"
-            "gc.collect()\n"
-            "null_view = CCPDualInterfaceTestToolkit.attached_c_from_header(0, False)\n"
+            "null_view = CCPDualInterfaceTestToolkit.attached_new_unbound()\n"
             "assert null_view.values is None\n"
+            "assert null_view.address == 'NULL'\n"
             "del null_view\n"
             "gc.collect()\n"
             "owner.free_owned()\n"
         )
 
     def test_09_null_header_attach_raises(self) -> None:
-        """Attaching a NULL-header wrapper raises BufferError (error-proof
-        construction path)."""
+        """Attaching an unbound (header-NULL) wrapper raises BufferError
+        (error-proof construction path)."""
         self._assert_clean_run(
             "from cbase.allocator_protocol.c_dual_interface import CCPDualInterfaceTestToolkit\n"
-            "null_view = CCPDualInterfaceTestToolkit.attached_c_from_header(0, False)\n"
+            "null_view = CCPDualInterfaceTestToolkit.attached_new_unbound()\n"
             "assert null_view.values is None\n"
             "try:\n"
-            "    CCPDualInterfaceTestToolkit.attached_attach(null_view)\n"
+            "    CCPDualInterfaceTestToolkit.attached_ccp_attach(null_view)\n"
             "    raise AssertionError('expected BufferError')\n"
             "except BufferError:\n"
             "    pass\n"
@@ -242,9 +234,7 @@ class TestCCPAttachmentProtocol(unittest.TestCase):
             "owner = CCPBoundBuffer(8)\n"
             "owner.values = b'01234567'\n"
             "bound_view = CCPDualInterfaceTestToolkit.c_from_header(CCPDualInterfaceTestToolkit.header_addr(owner), False)\n"
-            "CCPDualInterfaceTestToolkit.ccp_bind(bound_view)\n"
             "attached_view = CCPDualInterfaceTestToolkit.attached_c_from_header(CCPDualInterfaceTestToolkit.header_addr(owner), False)\n"
-            "CCPDualInterfaceTestToolkit.attached_attach(attached_view)\n"
             "assert bound_view.address != 'NULL'\n"
             "assert attached_view.address != 'NULL'\n"
             "owner.self_dealloc()\n"
@@ -256,7 +246,7 @@ class TestCCPAttachmentProtocol(unittest.TestCase):
             "del attached_view\n"
         )
 
-    def test_12_gc_attached_owner_graceful(self) -> None:
+    def test_12_gccp_attached_owner_graceful(self) -> None:
         """Garbage-collecting an attached owning wrapper frees the buffer
         without a vigilant abort or dealloc exceptions."""
         self._assert_clean_run(
@@ -268,7 +258,7 @@ class TestCCPAttachmentProtocol(unittest.TestCase):
             "gc.collect()\n"
         )
 
-    def test_13_gc_attached_view_detaches_before_owner_free(self) -> None:
+    def test_13_gccp_attached_view_detaches_before_owner_free(self) -> None:
         """GC of an attached VIEW detaches via CCPAttachedBuffer.__dealloc__:
         the binding is released so the owner frees cleanly afterwards."""
         self._assert_clean_run(
@@ -276,7 +266,6 @@ class TestCCPAttachmentProtocol(unittest.TestCase):
             "from cbase.allocator_protocol.c_dual_interface import CCPAttachedBuffer, CCPDualInterfaceTestToolkit\n"
             "owner = CCPAttachedBuffer(8)\n"
             "view = CCPDualInterfaceTestToolkit.attached_c_from_header(CCPDualInterfaceTestToolkit.attached_header_addr(owner), False)\n"
-            "CCPDualInterfaceTestToolkit.attached_attach(view)\n"
             "del view\n"
             "gc.collect()\n"
             "owner.free_owned()\n"
@@ -319,6 +308,77 @@ class TestCCPAttachmentProtocol(unittest.TestCase):
             "owner.free_owned()\n"
             "assert CCPDualInterfaceTestToolkit.buffer_header_addr(view) == view_addr\n"
             "del view\n"
+        )
+
+    def test_16_bound_embedded_adoption_helper(self) -> None:
+        """c_from_header_embedded adopts an interior pointer and binds
+        embedded inside; writes land in the parent, and the owner free
+        husks the entry."""
+        self._assert_clean_run(
+            "from cbase.allocator_protocol.c_dual_interface import CCPBoundBuffer, CCPDualInterfaceTestToolkit\n"
+            "owner = CCPBoundBuffer(8)\n"
+            "owner.values = b'01234567'\n"
+            "entry = CCPDualInterfaceTestToolkit.c_from_header_embedded(CCPDualInterfaceTestToolkit.header_addr(owner) + 3, CCPDualInterfaceTestToolkit.header_addr(owner))\n"
+            "assert CCPDualInterfaceTestToolkit.header_addr(entry) == CCPDualInterfaceTestToolkit.header_addr(owner) + 3\n"
+            "assert entry.values == b'34567'\n"
+            "entry.values = b'zz'\n"
+            "assert owner.values == b'012zz' + b'\\x00' * 3\n"
+            "owner.self_dealloc()\n"
+            "assert CCPDualInterfaceTestToolkit.header_addr(entry) == 0\n"
+            "del entry\n"
+        )
+
+    def test_17_attached_embedded_adoption_helper(self) -> None:
+        """attached_c_from_header_embedded adopts an interior pointer and
+        attaches embedded inside; the owner free husks the entry."""
+        self._assert_clean_run(
+            "from cbase.allocator_protocol.c_dual_interface import CCPAttachedBuffer, CCPDualInterfaceTestToolkit\n"
+            "owner = CCPAttachedBuffer(8)\n"
+            "owner.values = b'01234567'\n"
+            "entry = CCPDualInterfaceTestToolkit.attached_c_from_header_embedded(CCPDualInterfaceTestToolkit.attached_header_addr(owner) + 3, CCPDualInterfaceTestToolkit.attached_header_addr(owner))\n"
+            "assert CCPDualInterfaceTestToolkit.attached_header_addr(entry) == CCPDualInterfaceTestToolkit.attached_header_addr(owner) + 3\n"
+            "assert entry.values == b'34567'\n"
+            "entry.values = b'zz'\n"
+            "assert owner.values == b'012zz' + b'\\x00' * 3\n"
+            "owner.free_owned()\n"
+            "assert CCPDualInterfaceTestToolkit.attached_header_addr(entry) == 0\n"
+            "del entry\n"
+        )
+
+    def _assert_abort_run(self, code: str) -> None:
+        proc = self._run_in_subprocess(code)
+        self.assertEqual(proc.returncode, -6, f"stderr:\n{proc.stderr}")
+        self.assertIn("[CCP] ERROR", proc.stderr)
+        self.assertIn("double", proc.stderr)
+
+    def test_18_double_attach_on_owned_aborts(self) -> None:
+        """A second attach on an already-attached wrapper aborts (SIGABRT)
+        with a [CCP] ERROR message on stderr — the ctx must be fresh (the
+        zeroed allocation guarantees ap_header == NULL on first attach)."""
+        self._assert_abort_run(
+            "from cbase.allocator_protocol.c_dual_interface import CCPAttachedBuffer, CCPDualInterfaceTestToolkit\n"
+            "array = CCPAttachedBuffer(8)\n"
+            "CCPDualInterfaceTestToolkit.attached_ccp_attach(array)\n"
+        )
+
+    def test_19_double_attach_after_adoption_aborts(self) -> None:
+        """attached_c_from_header already attaches inside — an explicit
+        attached_ccp_attach afterwards is a double attach and aborts."""
+        self._assert_abort_run(
+            "from cbase.allocator_protocol.c_dual_interface import CCPAttachedBuffer, CCPDualInterfaceTestToolkit\n"
+            "owner = CCPAttachedBuffer(8)\n"
+            "view = CCPDualInterfaceTestToolkit.attached_c_from_header(CCPDualInterfaceTestToolkit.attached_header_addr(owner), False)\n"
+            "CCPDualInterfaceTestToolkit.attached_ccp_attach(view)\n"
+        )
+
+    def test_20_double_attach_embedded_aborts(self) -> None:
+        """attached_c_from_header_embedded already attaches embedded inside
+        — an explicit attached_ccp_attach_embedded afterwards aborts."""
+        self._assert_abort_run(
+            "from cbase.allocator_protocol.c_dual_interface import CCPAttachedBuffer, CCPDualInterfaceTestToolkit\n"
+            "owner = CCPAttachedBuffer(8)\n"
+            "entry = CCPDualInterfaceTestToolkit.attached_c_from_header_embedded(CCPDualInterfaceTestToolkit.attached_header_addr(owner) + 1, CCPDualInterfaceTestToolkit.attached_header_addr(owner))\n"
+            "CCPDualInterfaceTestToolkit.attached_ccp_attach_embedded(entry, CCPDualInterfaceTestToolkit.attached_header_addr(owner))\n"
         )
 
 

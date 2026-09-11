@@ -19,13 +19,16 @@ class TestCCPDualInterfaceTestToolkit(unittest.TestCase):
     Expected behavior:
         - owned: __init__ binds; values round-trip (zero-padded);
           self_dealloc / GC free gracefully.
-        - view: c_from_header + ccp_bind shares the owner's buffer; freeing
-          the owner releases the view's binding and nulls its header.
-        - embedded: interior-pointer wrappers bind via ccp_bind_embedded;
-          ref-counts balance on both child-GC-first and parent-free-first.
-        - unbound: wrappers never bound deallocate silently.
-        - error-proof: a NULL header reports values None, and binding it
-          raises BufferError.
+        - view: c_from_header adopts a block start and binds inside;
+          freeing the owner releases the view's binding and nulls its
+          header.
+        - embedded: c_from_header_embedded adopts an interior pointer and
+          binds embedded inside; ref-counts balance on both child-GC-first
+          and parent-free-first.
+        - unbound: __new__-only wrappers (never bound) deallocate
+          silently.
+        - error-proof: an unbound wrapper reports values None, and
+          binding it raises BufferError.
 
     Oracle: the child process must exit 0 with no "[AP_ALLOC_VIGILANT] ERROR"
     and no "Exception ignored" on stderr (failures segfault (139) or abort
@@ -96,15 +99,14 @@ class TestCCPDualInterfaceTestToolkit(unittest.TestCase):
         )
 
     def test_04_view_wrapper_lifecycle(self) -> None:
-        """A view (c_from_header on the owner's block start + ccp_bind)
-        shares the buffer; freeing the owner releases the view's binding and
-        nulls its header; view GC afterwards is silent."""
+        """A view (c_from_header on the owner's block start) is bound at
+        adoption; freeing the owner releases the view's binding and nulls
+        its header; view GC afterwards is silent."""
         self._assert_clean_run(
             "from cbase.allocator_protocol.c_dual_interface import CCPBoundBuffer, CCPDualInterfaceTestToolkit\n"
             "owner = CCPBoundBuffer(8)\n"
             "owner.values = b'01234567'\n"
             "view = CCPDualInterfaceTestToolkit.c_from_header(CCPDualInterfaceTestToolkit.header_addr(owner), False)\n"
-            "CCPDualInterfaceTestToolkit.ccp_bind(view)\n"
             "assert view.address != 'NULL'\n"
             "assert view.values == b'01234567'\n"
             "view.values = b'abcdefgh'\n"
@@ -148,15 +150,15 @@ class TestCCPDualInterfaceTestToolkit(unittest.TestCase):
             "owner.self_dealloc()\n"
         )
 
-    def test_07_two_step_embedded_bind(self) -> None:
-        """The explicit two-step path — c_from_header on an interior pointer
-        then ccp_bind_embedded with the parent block address — works."""
+    def test_07_embedded_adoption_helper(self) -> None:
+        """c_from_header_embedded adopts an interior pointer and binds it
+        embedded (with the parent block start) inside — no caller-side
+        bind; writes land in the owner."""
         self._assert_clean_run(
             "from cbase.allocator_protocol.c_dual_interface import CCPBoundBuffer, CCPDualInterfaceTestToolkit\n"
             "owner = CCPBoundBuffer(8)\n"
             "owner.values = b'01234567'\n"
-            "entry = CCPDualInterfaceTestToolkit.c_from_header(CCPDualInterfaceTestToolkit.header_addr(owner) + 3, False)\n"
-            "CCPDualInterfaceTestToolkit.ccp_bind_embedded(entry, CCPDualInterfaceTestToolkit.header_addr(owner))\n"
+            "entry = CCPDualInterfaceTestToolkit.c_from_header_embedded(CCPDualInterfaceTestToolkit.header_addr(owner) + 3, CCPDualInterfaceTestToolkit.header_addr(owner))\n"
             "assert entry.values == b'34567'\n"
             "entry.values = b'zz'\n"
             "assert owner.values == b'012zz' + b'\\x00' * 3\n"
@@ -166,18 +168,18 @@ class TestCCPDualInterfaceTestToolkit(unittest.TestCase):
         )
 
     def test_08_unbound_wrappers_dealloc_gracefully(self) -> None:
-        """Wrappers created WITHOUT ccp_bind / ccp_bind_embedded must still
-        deallocate silently: an unbound view, a bare CCPType instance, and
-        the parent free."""
+        """Wrappers that never gained a binding — a __new__-only wrapper
+        and a bare CCPType — deallocate silently, and the parent free
+        completes."""
         self._assert_clean_run(
             "import gc\n"
             "from cbase.allocator_protocol.c_dual_interface import CCPType, CCPBoundBuffer, CCPDualInterfaceTestToolkit\n"
             "owner = CCPBoundBuffer(8)\n"
             "owner.values = b'01234567'\n"
-            "view = CCPDualInterfaceTestToolkit.c_from_header(CCPDualInterfaceTestToolkit.header_addr(owner), False)\n"
-            "assert view.values == b'01234567'\n"
-            "assert view.address == 'NULL'\n"
-            "del view\n"
+            "null_view = CCPDualInterfaceTestToolkit.new_unbound()\n"
+            "assert null_view.values is None\n"
+            "assert null_view.address == 'NULL'\n"
+            "del null_view\n"
             "gc.collect()\n"
             "bare = CCPType()\n"
             "del bare\n"
@@ -186,11 +188,11 @@ class TestCCPDualInterfaceTestToolkit(unittest.TestCase):
         )
 
     def test_09_null_header_bind_raises(self) -> None:
-        """A NULL-header wrapper reports values None, and binding it raises
-        BufferError (error-proof construction path)."""
+        """An unbound (header-NULL) wrapper reports values None, and
+        binding it raises BufferError (error-proof construction path)."""
         self._assert_clean_run(
             "from cbase.allocator_protocol.c_dual_interface import CCPDualInterfaceTestToolkit\n"
-            "null_view = CCPDualInterfaceTestToolkit.c_from_header(0, False)\n"
+            "null_view = CCPDualInterfaceTestToolkit.new_unbound()\n"
             "assert null_view.values is None\n"
             "try:\n"
             "    CCPDualInterfaceTestToolkit.ccp_bind(null_view)\n"
@@ -221,7 +223,6 @@ class TestCCPDualInterfaceTestToolkit(unittest.TestCase):
             "owner = CCPBoundBuffer(8)\n"
             "owner.values = b'01234567'\n"
             "view = CCPDualInterfaceTestToolkit.c_from_header(CCPDualInterfaceTestToolkit.header_addr(owner), False)\n"
-            "CCPDualInterfaceTestToolkit.ccp_bind(view)\n"
             "assert view.size == 8\n"
             "owner.self_dealloc()\n"
             "assert owner.size == 0\n"
@@ -243,6 +244,42 @@ class TestCCPDualInterfaceTestToolkit(unittest.TestCase):
             "assert entry.size == 0\n"
             "assert CCPDualInterfaceTestToolkit.header_addr(entry) == 0\n"
             "del entry\n"
+        )
+
+    def _assert_abort_run(self, code: str) -> None:
+        proc = self._run_in_subprocess(code)
+        self.assertEqual(proc.returncode, -6, f"stderr:\n{proc.stderr}")
+        self.assertIn("[CCP] ERROR", proc.stderr)
+        self.assertIn("double", proc.stderr)
+
+    def test_13_double_bind_on_owned_aborts(self) -> None:
+        """A second ccp_bind on an already-bound wrapper aborts (SIGABRT)
+        with a [CCP] ERROR message on stderr — the ctx must be fresh (the
+        zeroed allocation guarantees ap_header == NULL on first bind)."""
+        self._assert_abort_run(
+            "from cbase.allocator_protocol.c_dual_interface import CCPBoundBuffer, CCPDualInterfaceTestToolkit\n"
+            "array = CCPBoundBuffer(8)\n"
+            "CCPDualInterfaceTestToolkit.ccp_bind(array)\n"
+        )
+
+    def test_14_double_bind_after_adoption_aborts(self) -> None:
+        """c_from_header already binds inside — an explicit ccp_bind
+        afterwards is a double bind and aborts."""
+        self._assert_abort_run(
+            "from cbase.allocator_protocol.c_dual_interface import CCPBoundBuffer, CCPDualInterfaceTestToolkit\n"
+            "owner = CCPBoundBuffer(8)\n"
+            "view = CCPDualInterfaceTestToolkit.c_from_header(CCPDualInterfaceTestToolkit.header_addr(owner), False)\n"
+            "CCPDualInterfaceTestToolkit.ccp_bind(view)\n"
+        )
+
+    def test_15_double_bind_embedded_aborts(self) -> None:
+        """c_from_header_embedded already binds embedded inside — an
+        explicit ccp_bind_embedded afterwards aborts."""
+        self._assert_abort_run(
+            "from cbase.allocator_protocol.c_dual_interface import CCPBoundBuffer, CCPDualInterfaceTestToolkit\n"
+            "owner = CCPBoundBuffer(8)\n"
+            "entry = CCPDualInterfaceTestToolkit.c_from_header_embedded(CCPDualInterfaceTestToolkit.header_addr(owner) + 1, CCPDualInterfaceTestToolkit.header_addr(owner))\n"
+            "CCPDualInterfaceTestToolkit.ccp_bind_embedded(entry, CCPDualInterfaceTestToolkit.header_addr(owner))\n"
         )
 
 
