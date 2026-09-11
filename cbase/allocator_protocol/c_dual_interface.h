@@ -1,6 +1,9 @@
 #ifndef C_CCP_DUAL_INTERFACE_H
 #define C_CCP_DUAL_INTERFACE_H
 
+#include <stdio.h>
+#include <stdlib.h>
+
 #include <Python.h>
 
 #include <cbase/allocator_protocol/c_allocator_protocol.h>
@@ -53,6 +56,8 @@ typedef struct ccp_bound_pyclass {
 
 // ========== Forward Declaration ==========
 
+static inline void c_ccp_abort_if_bound(const char* op, PyObject* py_object, const ccp_ctx* ccp);
+
 static inline void c_ccp_bound_callback_adaptor(ap_callback_event event, void* buf, void* user_data);
 static inline void c_ccp_context_callback_adaptor(ap_callback_event event, void* buf, void* user_data);
 
@@ -65,6 +70,24 @@ static inline int  c_ccp_attach_embedded(PyObject* py_object, const void** c_hea
 static inline int  c_ccp_detach(PyObject* py_object, ccp_ctx* ccp);
 
 // ========== Utilities Functions ==========
+
+/**
+ * @brief Abort when a bind/attach is attempted on an already-bound ctx.
+ *
+ * The allocator protocol zeroes every allocation it hands out, so a fresh
+ * ccp_ctx has ap_header == NULL; a non-NULL ap_header means the wrapper is
+ * already bound/attached — a fatal usage error (double bind/attach leaks a
+ * callback node and double-increfs the block).
+ *
+ * @param op        The violated operation name (for the error message).
+ * @param py_object The wrapper object.
+ * @param ccp       The wrapper's ccp_ctx.
+ */
+static inline void c_ccp_abort_if_bound(const char* op, PyObject* py_object, const ccp_ctx* ccp) {
+    if (!ccp->ap_header) return;
+    fprintf(stderr, "[CCP] ERROR: %s on an already-bound wrapper <%p> (allocator_protocol* %p) — bind/attach exactly once, at its one construction path\n", op, (void*) py_object, (void*) ccp->ap_header);
+    abort();
+}
 
 static inline void c_ccp_bound_callback_adaptor(ap_callback_event event, void* buf, void* user_data) {
     if (event == AP_CALLBACK_EVENT_FREE) {
@@ -106,7 +129,8 @@ static inline void c_ccp_context_callback_adaptor(ap_callback_event event, void*
 // ========== Public APIs (Inheritance Protocol) ==========
 
 static inline int c_ccp_bind(PyObject* py_object, const void** c_header) {
-    ccp_protocol*       ccp = (ccp_protocol*) py_object;
+    ccp_protocol* ccp = (ccp_protocol*) py_object;
+    c_ccp_abort_if_bound("double bind", py_object, &ccp->ctx);
     size_t              offset = (char*) c_header - (char*) py_object;
     const void*         header = *c_header;
     allocator_protocol* allocator_protocol = c_ap_protocol_from_ptr(header);
@@ -119,7 +143,8 @@ static inline int c_ccp_bind(PyObject* py_object, const void** c_header) {
 }
 
 static inline int c_ccp_bind_embedded(PyObject* py_object, const void** c_header, const void* parent_header) {
-    ccp_protocol*       ccp = (ccp_protocol*) py_object;
+    ccp_protocol* ccp = (ccp_protocol*) py_object;
+    c_ccp_abort_if_bound("double bind (embedded)", py_object, &ccp->ctx);
     size_t              offset = (char*) c_header - (char*) py_object;
     allocator_protocol* allocator_protocol = c_ap_protocol_from_ptr(parent_header);
     int                 ret_code = c_ap_register_callback(allocator_protocol, c_ccp_bound_callback_adaptor, py_object, &ccp->ctx.ap_binding_id);
@@ -160,6 +185,7 @@ static inline int c_ccp_unbind(PyObject* py_object) {
  */
 static inline int c_ccp_attach(PyObject* py_object, const void** c_header, ccp_ctx* ccp) {
     if (!py_object || !c_header || !ccp) return AP_ERR_INVALID_ARG;
+    c_ccp_abort_if_bound("double attach", py_object, ccp);
     size_t              ccp_offset = (char*) ccp - (char*) py_object;
     size_t              c_offset = (char*) c_header - (char*) py_object;
     const void*         header = *c_header;
@@ -184,6 +210,7 @@ static inline int c_ccp_attach(PyObject* py_object, const void** c_header, ccp_c
  */
 static inline int c_ccp_attach_embedded(PyObject* py_object, const void** c_header, ccp_ctx* ccp, const void* parent_header) {
     if (!py_object || !c_header || !ccp) return AP_ERR_INVALID_ARG;
+    c_ccp_abort_if_bound("double attach (embedded)", py_object, ccp);
     size_t              ccp_offset = (char*) ccp - (char*) py_object;
     size_t              c_offset = (char*) c_header - (char*) py_object;
     allocator_protocol* allocator_protocol = c_ap_protocol_from_ptr(parent_header);

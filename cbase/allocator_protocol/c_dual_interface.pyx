@@ -32,21 +32,21 @@ cdef class CCPType:
         raise BufferError(f'[CCP] Failed to unbind embedded from allocator_protocol* {<uintptr_t> self.ap_header:#0x}')
 
     @staticmethod
-    cdef inline void c_attach(PyObject* py_object, const void** c_header, ccp_ctx* ccp, void* dealloc_fn) except *:
+    cdef inline void ccp_attach(PyObject* py_object, const void** c_header, ccp_ctx* ccp, void* dealloc_fn) except *:
         cdef int ret_code = c_ccp_attach(py_object, c_header, ccp)
         if ret_code != ap_ret_code.AP_OK:
             raise BufferError(f'[CCP] Failed to attach to allocator_protocol* {<uintptr_t> ccp.ap_header:#0x}')
         ccp.cy_extra_dealloc_fn = <cpp_extra_dealloc_func> dealloc_fn
 
     @staticmethod
-    cdef inline void c_attach_embedded(PyObject* py_object, const void** c_header, ccp_ctx* ccp, const void* parent_header, void* dealloc_fn) except *:
+    cdef inline void ccp_attach_embedded(PyObject* py_object, const void** c_header, ccp_ctx* ccp, const void* parent_header, void* dealloc_fn) except *:
         cdef int ret_code = c_ccp_attach_embedded(py_object, c_header, ccp, parent_header)
         if ret_code != ap_ret_code.AP_OK:
             raise BufferError(f'[CCP] Failed to attach embedded to allocator_protocol* {<uintptr_t> ccp.ap_header:#0x}')
         ccp.cy_extra_dealloc_fn = <cpp_extra_dealloc_func> dealloc_fn
 
     @staticmethod
-    cdef inline void c_detach(PyObject* py_object, ccp_ctx* ccp) except *:
+    cdef inline void ccp_detach(PyObject* py_object, ccp_ctx* ccp) except *:
         cdef int ret_code = c_ccp_detach(py_object, ccp)
         if ret_code == ap_ret_code.AP_OK:
             return
@@ -135,66 +135,6 @@ cdef class BoundBuffer:
                 memset(self.header + val_len, 0, self.size - val_len)
 
 
-cdef class CCPAttachedBuffer(BoundBuffer):
-
-    def __init__(self, size_t size):
-        BoundBuffer.__init__(self, size)
-        if self.header:
-            self.c_attach()
-
-    cdef void __ccp_dealloc__(self):
-        self.size = 0
-
-    cdef void c_attach(self):
-        CCPType.c_attach(<PyObject*> self, <const void**> &self.header, &self.ccp_ctx, <void*> self.__ccp_dealloc__)
-
-    cdef void c_attach_embedded(self, const void* parent_header):
-        CCPType.c_attach_embedded(<PyObject*> self, <const void**> &self.header, &self.ccp_ctx, parent_header, <void*> self.__ccp_dealloc__)
-
-    cdef void c_detach(self):
-        CCPType.c_detach(<PyObject*> self, &self.ccp_ctx)
-
-    def __dealloc__(self):
-        self.c_detach()
-
-    @staticmethod
-    cdef CCPAttachedBuffer c_from_header(char* header, bint owner=False):
-        cdef CCPAttachedBuffer instance = CCPAttachedBuffer.__new__(CCPAttachedBuffer)
-        memset(&instance.ccp_ctx, 0, sizeof(ccp_ctx))
-        instance.header = header
-        instance.owner = owner
-        if header:
-            instance.size = strlen(header)
-        else:
-            instance.size = 0
-        return instance
-
-    cdef CCPAttachedBuffer c_alloc_child(self, size_t size):
-        if not self.header:
-            raise BufferError('parent buffer was released')
-
-        cdef char* child = <char*> c_ap_alloc_child(size, NULL, self.header)
-        if child == NULL:
-            raise MemoryError(f'Failed to allocate child buffer of size {size}.')
-
-        cdef CCPAttachedBuffer instance = CCPAttachedBuffer.__new__(CCPAttachedBuffer)
-        memset(&instance.ccp_ctx, 0, sizeof(ccp_ctx))
-        instance.header = child
-        instance.owner = True
-        instance.size = size
-        instance.c_attach()
-        return instance
-
-    def alloc_child(self, size_t size):
-        return self.c_alloc_child(size)
-
-    property address:
-        def __get__(self):
-            if not self.ccp_ctx.ap_header:
-                return 'NULL'
-            return f'{<uintptr_t> self.ccp_ctx.ap_header.buf:#0x}'
-
-
 cdef class CCPBoundBuffer(CCPType):
     def __init__(self, size_t size):
         self.header = <char*> c_ap_alloc(size, AP_DEFAULT_ALLOCATOR)
@@ -220,10 +160,17 @@ cdef class CCPBoundBuffer(CCPType):
         cdef CCPBoundBuffer instance = CCPBoundBuffer.__new__(CCPBoundBuffer)
         instance.header = header
         instance.owner = owner
-        if header:
-            instance.size = strlen(header)
-        else:
-            instance.size = 0
+        instance.size = strlen(header)
+        instance.ccp_bind(&instance.header)          # block start — bind inside
+        return instance
+
+    @staticmethod
+    cdef CCPBoundBuffer c_from_header_embedded(char* header, const void* parent_header):
+        cdef CCPBoundBuffer instance = CCPBoundBuffer.__new__(CCPBoundBuffer)
+        instance.header = header
+        instance.owner = False
+        instance.size = strlen(header)
+        instance.ccp_bind_embedded(&instance.header, parent_header)   # interior — bind embedded inside
         return instance
 
     def self_dealloc(self):
@@ -277,6 +224,72 @@ cdef class CCPBoundBuffer(CCPType):
                 memset(self.header + val_len, 0, self.size - val_len)
 
 
+cdef class CCPAttachedBuffer(BoundBuffer):
+    def __init__(self, size_t size):
+        BoundBuffer.__init__(self, size)
+        self.ccp_attach()
+
+    cdef void __ccp_dealloc__(self):
+        self.size = 0
+
+    def __dealloc__(self):
+        self.ccp_detach()
+
+    cdef inline void ccp_attach(self):
+        CCPType.ccp_attach(<PyObject*> self, <const void**> &self.header, &self.ccp_ctx, <void*> self.__ccp_dealloc__)
+
+    cdef inline void ccp_attach_embedded(self, const void* parent_header):
+        CCPType.ccp_attach_embedded(<PyObject*> self, <const void**> &self.header, &self.ccp_ctx, parent_header, <void*> self.__ccp_dealloc__)
+
+    cdef inline void ccp_detach(self):
+        CCPType.ccp_detach(<PyObject*> self, &self.ccp_ctx)
+
+    @staticmethod
+    cdef CCPAttachedBuffer c_from_header(char* header, bint owner=False):
+        cdef CCPAttachedBuffer instance = CCPAttachedBuffer.__new__(CCPAttachedBuffer)
+        memset(&instance.ccp_ctx, 0, sizeof(ccp_ctx))
+        instance.header = header
+        instance.owner = owner
+        instance.size = strlen(header)
+        instance.ccp_attach()              # block start — attach inside
+        return instance
+
+    @staticmethod
+    cdef CCPAttachedBuffer c_from_header_embedded(char* header, const void* parent_header):
+        cdef CCPAttachedBuffer instance = CCPAttachedBuffer.__new__(CCPAttachedBuffer)
+        memset(&instance.ccp_ctx, 0, sizeof(ccp_ctx))
+        instance.header = header
+        instance.owner = False
+        instance.size = strlen(header)
+        instance.ccp_attach_embedded(parent_header)   # interior — attach embedded inside
+        return instance
+
+    cdef CCPAttachedBuffer c_alloc_child(self, size_t size):
+        if not self.header:
+            raise BufferError('parent buffer was released')
+
+        cdef char* child = <char*> c_ap_alloc_child(size, NULL, self.header)
+        if child == NULL:
+            raise MemoryError(f'Failed to allocate child buffer of size {size}.')
+
+        cdef CCPAttachedBuffer instance = CCPAttachedBuffer.__new__(CCPAttachedBuffer)
+        memset(&instance.ccp_ctx, 0, sizeof(ccp_ctx))
+        instance.header = child
+        instance.owner = True
+        instance.size = size
+        instance.ccp_attach()
+        return instance
+
+    def alloc_child(self, size_t size):
+        return self.c_alloc_child(size)
+
+    property address:
+        def __get__(self):
+            if not self.ccp_ctx.ap_header:
+                return 'NULL'
+            return f'{<uintptr_t> self.ccp_ctx.ap_header.buf:#0x}'
+
+
 cdef class CCPDualInterfaceTestToolkit:
     """Test toolkit exposing the cdef-only dual-interface operations to the
     Python unittest suite, driving the bound scenarios (owned, view,
@@ -286,6 +299,14 @@ cdef class CCPDualInterfaceTestToolkit:
     @staticmethod
     def c_from_header(uintptr_t header_addr, bint owner=False):
         return CCPBoundBuffer.c_from_header(<char*> header_addr, owner)
+
+    @staticmethod
+    def c_from_header_embedded(uintptr_t header_addr, uintptr_t parent_addr):
+        return CCPBoundBuffer.c_from_header_embedded(<char*> header_addr, <const void*> parent_addr)
+
+    @staticmethod
+    def new_unbound():
+        return CCPBoundBuffer.__new__(CCPBoundBuffer)
 
     @staticmethod
     def ccp_bind(CCPBoundBuffer array):
@@ -306,8 +327,7 @@ cdef class CCPDualInterfaceTestToolkit:
         if index >= parent.size:
             raise IndexError(index)
 
-        cdef CCPBoundBuffer instance = CCPBoundBuffer.c_from_header(parent.header + index, False)
-        instance.ccp_bind_embedded(&instance.header, parent.header)
+        cdef CCPBoundBuffer instance = CCPBoundBuffer.c_from_header_embedded(parent.header + index, parent.header)
         return instance
 
     @staticmethod
@@ -404,16 +424,26 @@ cdef class CCPDualInterfaceTestToolkit:
         return CCPAttachedBuffer.c_from_header(<char*> header_addr, owner)
 
     @staticmethod
-    def attached_attach(CCPAttachedBuffer array):
-        array.c_attach()
+    def attached_c_from_header_embedded(uintptr_t header_addr, uintptr_t parent_addr):
+        return CCPAttachedBuffer.c_from_header_embedded(<char*> header_addr, <const void*> parent_addr)
 
     @staticmethod
-    def attached_attach_embedded(CCPAttachedBuffer array, uintptr_t parent_addr):
-        array.c_attach_embedded(<const void*> parent_addr)
+    def attached_new_unbound():
+        cdef CCPAttachedBuffer instance = CCPAttachedBuffer.__new__(CCPAttachedBuffer)
+        memset(&instance.ccp_ctx, 0, sizeof(ccp_ctx))
+        return instance
 
     @staticmethod
-    def attached_detach(CCPAttachedBuffer array):
-        array.c_detach()
+    def attached_ccp_attach(CCPAttachedBuffer array):
+        array.ccp_attach()
+
+    @staticmethod
+    def attached_ccp_attach_embedded(CCPAttachedBuffer array, uintptr_t parent_addr):
+        array.ccp_attach_embedded(<const void*> parent_addr)
+
+    @staticmethod
+    def attached_ccp_detach(CCPAttachedBuffer array):
+        array.ccp_detach()
 
     @staticmethod
     def attached_embedded_from(CCPAttachedBuffer parent, size_t index):
@@ -422,8 +452,7 @@ cdef class CCPDualInterfaceTestToolkit:
         if index >= parent.size:
             raise IndexError(index)
 
-        cdef CCPAttachedBuffer instance = CCPAttachedBuffer.c_from_header(parent.header + index, False)
-        instance.c_attach_embedded(parent.header)
+        cdef CCPAttachedBuffer instance = CCPAttachedBuffer.c_from_header_embedded(parent.header + index, parent.header)
         return instance
 
     @staticmethod

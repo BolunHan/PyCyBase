@@ -14,8 +14,10 @@ class CCPType:
     allocator protocol via ``ccp_bind`` / ``ccp_bind_embedded``, so the
     wrapper is automatically unbound and invalidated when the buffer is
     freed (the FREE pass). Subclasses must call ``ccp_bind`` after every
-    ``_new``-like init and ``ccp_bind`` / ``ccp_bind_embedded`` after
-    every ``c_from_header``-like adoption. For wrappers that CANNOT
+    ``_new``-like init; the adoption helpers bind themselves inside —
+    ``c_from_header`` (block start) calls ``ccp_bind`` and
+    ``c_from_header_embedded`` (interior pointer) calls
+    ``ccp_bind_embedded``. For wrappers that CANNOT
     inherit ``CCPType`` (e.g. dict-derived classes like ``BoundByteMap``),
     use the attachment protocol instead — see ``CCPAttachedBuffer``.
 
@@ -28,7 +30,7 @@ class CCPType:
 
     The internal cdef binding methods (``__ccp_dealloc__``, ``ccp_bind``,
     ``ccp_bind_embedded``, ``ccp_unbind``) and the static attachment
-    helpers (``c_attach``, ``c_attach_embedded``, ``c_detach``) are
+    helpers (``ccp_attach``, ``ccp_attach_embedded``, ``ccp_detach``) are
     documented below as a deliberate exception — CCPType is foundational
     infrastructure; they are **not callable from Python** (the static
     helpers are cimport-callable from Cython modules).
@@ -62,8 +64,9 @@ class CCPType:
 
         Registers the wrapper on the buffer's allocator protocol, so the
         FREE pass unbinds it and nulls its header field before the block
-        is reclaimed. Call after every ``_new``-like init and every
-        block-start adoption (``c_from_header`` never binds itself).
+        is reclaimed. Called after every ``_new``-like init and inside
+        ``c_from_header`` — never again afterwards (a second bind is a
+        double bind).
 
         Signature as void* c_header as intended, only in this way the cython can skip the otherwise enforced type check.
 
@@ -76,6 +79,9 @@ class CCPType:
         Raises:
             BufferError: If the binding could not be registered (e.g. the
                 header is NULL).
+
+        The ctx must be FRESH: a double bind prints ``[CCP] ERROR`` to
+        stderr and aborts (SIGABRT).
         """
         ...
 
@@ -84,7 +90,8 @@ class CCPType:
 
         Like ``ccp_bind``, but the protocol and the held reference are
         derived from ``parent_header`` — the parent BLOCK START — because
-        no protocol can be derived from an interior pointer.
+        no protocol can be derived from an interior pointer. Called inside
+        ``c_from_header_embedded`` — never again afterwards.
 
         Args:
             c_header: Address of the wrapper's header field
@@ -94,6 +101,9 @@ class CCPType:
 
         Raises:
             BufferError: If the binding could not be registered.
+
+        The ctx must be FRESH: a double bind prints ``[CCP] ERROR`` to
+        stderr and aborts (SIGABRT).
         """
         ...
 
@@ -111,7 +121,7 @@ class CCPType:
         ...
 
     @staticmethod
-    def c_attach(py_object: c_void_ptr, c_header: c_void_ptr_ptr, ccp: c_void_ptr, dealloc_fn: c_void_ptr) -> None:
+    def ccp_attach(py_object: c_void_ptr, c_header: c_void_ptr_ptr, ccp: c_void_ptr, dealloc_fn: c_void_ptr) -> None:
         """**cython internal** Attach an embedded ccp_ctx to a block-start buffer.
 
         The shared implementation of the attachment protocol: registers
@@ -119,7 +129,7 @@ class CCPType:
         detaches the wrapper and nulls its header field) and arms
         ``dealloc_fn`` as the ``cy_extra_dealloc_fn`` hook. A
         cimport-callable static helper — attached wrapper classes
-        delegate their own ``c_attach`` to this.
+        delegate their own ``ccp_attach`` to this.
 
         Args:
             py_object: The wrapper object.
@@ -133,11 +143,14 @@ class CCPType:
         Raises:
             BufferError: If the attachment could not be registered (e.g.
                 the header is NULL).
+
+        The ctx must be FRESH: a double attach prints ``[CCP] ERROR`` to
+        stderr and aborts (SIGABRT).
         """
         ...
 
     @staticmethod
-    def c_attach_embedded(py_object: c_void_ptr, c_header: c_void_ptr_ptr, ccp: c_void_ptr, parent_header: c_void_ptr, dealloc_fn: c_void_ptr) -> None:
+    def ccp_attach_embedded(py_object: c_void_ptr, c_header: c_void_ptr_ptr, ccp: c_void_ptr, parent_header: c_void_ptr, dealloc_fn: c_void_ptr) -> None:
         """**cython internal** Attach an interior-pointer header to a parent block.
 
         The shared embedded variant: the protocol and the held reference
@@ -156,17 +169,20 @@ class CCPType:
 
         Raises:
             BufferError: If the attachment could not be registered.
+
+        The ctx must be FRESH: a double attach prints ``[CCP] ERROR`` to
+        stderr and aborts (SIGABRT).
         """
         ...
 
     @staticmethod
-    def c_detach(py_object: c_void_ptr, ccp: c_void_ptr) -> None:
+    def ccp_detach(py_object: c_void_ptr, ccp: c_void_ptr) -> None:
         """**cython internal** Release an attachment; idempotent.
 
         Unregisters the ctx's callback, clears the binding state and
         releases the reference held on the block start. Cimport-callable
         static helper — attached wrapper classes delegate their own
-        ``c_detach`` (called from ``__dealloc__``) to this.
+        ``ccp_detach`` (called from ``__dealloc__``) to this.
 
         Args:
             py_object: The wrapper object.
@@ -270,16 +286,19 @@ class CCPAttachedBuffer(BoundBuffer):
        ``BoundBuffer`` — header/owner pair, owner-flag freeing).
     2. Subclass it and embed the binding state (``cdef ccp_ctx ccp_ctx``);
        the repetitive protocol logic is bundled on ``CCPType`` as
-       cimport-callable static helpers — ``CCPType.c_attach`` /
-       ``CCPType.c_attach_embedded`` / ``CCPType.c_detach`` — and the
-       class delegates to them from its own thin ``c_attach`` /
-       ``c_attach_embedded`` / ``c_detach`` methods (one line each),
+       cimport-callable static helpers — ``CCPType.ccp_attach`` /
+       ``CCPType.ccp_attach_embedded`` / ``CCPType.ccp_detach`` — and the
+       class delegates to them from its own thin ``ccp_attach`` /
+       ``ccp_attach_embedded`` / ``ccp_detach`` methods (one line each),
        detaching in ``__dealloc__``.
     3. Implement the class-specific glue: a ``__ccp_dealloc__`` hook
        (required by the protocol — a no-op body is valid), ``__init__``
-       (attach after the ``_new``-like init), and ``c_from_header`` /
-       ``c_alloc_child`` (attach at the adoption call sites, zeroing the
-       ctx on ``__new__``-only paths).
+       (attach after the ``_new``-like init), and the two adoption
+       helpers plus ``c_alloc_child`` (zero the ctx on ``__new__``-only
+       paths). The adoption helpers attach themselves inside:
+       ``c_from_header`` adopts a block start (calls ``ccp_attach``) and
+       ``c_from_header_embedded`` adopts an interior pointer (calls
+       ``ccp_attach_embedded`` with the parent block start).
     4. When the buffer is freed, the FREE pass detaches the wrapper, runs
        the armed ``__ccp_dealloc__`` hook (zeroes ``size``), and nulls
        the header before the block is reclaimed.
@@ -430,15 +449,50 @@ class CCPDualInterfaceTestToolkit:
 
     @staticmethod
     def c_from_header(header_addr: int, owner: bool = False) -> CCPBoundBuffer:
-        """Adopt an existing buffer pointer as an unbound wrapper.
+        """Adopt a block-start buffer pointer and bind it inside.
+
+        Calls ``ccp_bind`` on the wrapper before returning — never bind
+        it again (a second bind is a double bind). The header is assumed
+        VALID: no NULL check is performed (``strlen`` and the inside bind
+        dereference it) — passing 0 is the caller's bug.
 
         Args:
-            header_addr: Raw buffer pointer as an integer.
+            header_addr: Raw buffer pointer as an integer (must be valid).
             owner: Whether the adopted wrapper owns the buffer.
 
         Returns:
-            An unbound ``CCPBoundBuffer``; bind it with ``ccp_bind`` or
-            ``ccp_bind_embedded``.
+            A bound ``CCPBoundBuffer``.
+        """
+        ...
+
+    @staticmethod
+    def c_from_header_embedded(header_addr: int, parent_addr: int) -> CCPBoundBuffer:
+        """Adopt an interior pointer and bind it embedded inside.
+
+        Calls ``ccp_bind_embedded`` with the parent block start on the
+        wrapper before returning — never bind it again. The header is
+        assumed VALID: no NULL check is performed — passing 0 is the
+        caller's bug.
+
+        Args:
+            header_addr: Raw interior pointer as an integer (must be
+                valid).
+            parent_addr: The parent block start as an integer.
+
+        Returns:
+            An embedded-bound ``CCPBoundBuffer``.
+        """
+        ...
+
+    @staticmethod
+    def new_unbound() -> CCPBoundBuffer:
+        """Create a raw, never-bound wrapper (header NULL).
+
+        Test-only: the error-proof path — ``values`` reports None and an
+        explicit ``ccp_bind`` raises BufferError.
+
+        Returns:
+            A ``CCPBoundBuffer`` created with ``__new__`` alone.
         """
         ...
 
@@ -647,21 +701,55 @@ class CCPDualInterfaceTestToolkit:
 
     @staticmethod
     def attached_c_from_header(header_addr: int, owner: bool = False) -> CCPAttachedBuffer:
-        """Adopt an existing buffer pointer as an unattached
-        ``CCPAttachedBuffer``.
+        """Adopt a block-start buffer pointer and attach it inside.
+
+        Calls ``ccp_attach`` on the wrapper before returning — never attach
+        it again. The header is assumed VALID: no NULL check is performed
+        (``strlen`` and the inside attach dereference it) — passing 0 is
+        the caller's bug.
 
         Args:
-            header_addr: Raw buffer pointer as an integer.
+            header_addr: Raw buffer pointer as an integer (must be valid).
             owner: Whether the adopted wrapper owns the buffer.
 
         Returns:
-            An unattached ``CCPAttachedBuffer``; attach it with
-            ``attached_attach`` or ``attached_attach_embedded``.
+            An attached ``CCPAttachedBuffer``.
         """
         ...
 
     @staticmethod
-    def attached_attach(array: CCPAttachedBuffer) -> None:
+    def attached_c_from_header_embedded(header_addr: int, parent_addr: int) -> CCPAttachedBuffer:
+        """Adopt an interior pointer and attach it embedded inside.
+
+        Calls ``ccp_attach_embedded`` with the parent block start on the
+        wrapper before returning — never attach it again. The header is
+        assumed VALID: no NULL check is performed — passing 0 is the
+        caller's bug.
+
+        Args:
+            header_addr: Raw interior pointer as an integer (must be
+                valid).
+            parent_addr: The parent block start as an integer.
+
+        Returns:
+            An embedded-attached ``CCPAttachedBuffer``.
+        """
+        ...
+
+    @staticmethod
+    def attached_new_unbound() -> CCPAttachedBuffer:
+        """Create a raw, never-attached wrapper (header NULL, ctx zeroed).
+
+        Test-only: the error-proof path — ``values`` reports None and an
+        explicit ``attached_ccp_attach`` raises BufferError.
+
+        Returns:
+            A ``CCPAttachedBuffer`` created with ``__new__`` alone.
+        """
+        ...
+
+    @staticmethod
+    def attached_ccp_attach(array: CCPAttachedBuffer) -> None:
         """Attach a block-start wrapper to its buffer's protocol.
 
         Args:
@@ -670,7 +758,7 @@ class CCPDualInterfaceTestToolkit:
         ...
 
     @staticmethod
-    def attached_attach_embedded(array: CCPAttachedBuffer, parent_addr: int) -> None:
+    def attached_ccp_attach_embedded(array: CCPAttachedBuffer, parent_addr: int) -> None:
         """Attach an interior-pointer wrapper to a parent block.
 
         Args:
@@ -680,7 +768,7 @@ class CCPDualInterfaceTestToolkit:
         ...
 
     @staticmethod
-    def attached_detach(array: CCPAttachedBuffer) -> None:
+    def attached_ccp_detach(array: CCPAttachedBuffer) -> None:
         """Release a wrapper's attachment; idempotent when already detached.
 
         Args:

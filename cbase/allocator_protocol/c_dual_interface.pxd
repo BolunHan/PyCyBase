@@ -53,13 +53,13 @@ cdef class CCPType:
     cdef void ccp_unbind(self)
 
     @staticmethod
-    cdef inline void c_attach(PyObject* py_object, const void** c_header, ccp_ctx* ccp, void* dealloc_fn) except *
+    cdef inline void ccp_attach(PyObject* py_object, const void** c_header, ccp_ctx* ccp, void* dealloc_fn) except *
 
     @staticmethod
-    cdef inline void c_attach_embedded(PyObject* py_object, const void** c_header, ccp_ctx* ccp, const void* parent_header, void* dealloc_fn) except *
+    cdef inline void ccp_attach_embedded(PyObject* py_object, const void** c_header, ccp_ctx* ccp, const void* parent_header, void* dealloc_fn) except *
 
     @staticmethod
-    cdef inline void c_detach(PyObject* py_object, ccp_ctx* ccp) except *
+    cdef inline void ccp_detach(PyObject* py_object, ccp_ctx* ccp) except *
 
 
 cdef class BoundBuffer:
@@ -81,14 +81,17 @@ cdef class CCPAttachedBuffer(BoundBuffer):
 
     cdef void __ccp_dealloc__(self)
 
-    cdef void c_attach(self)
+    cdef void ccp_attach(self)
 
-    cdef void c_attach_embedded(self, const void* parent_header)
+    cdef void ccp_attach_embedded(self, const void* parent_header)
 
-    cdef void c_detach(self)
+    cdef void ccp_detach(self)
 
     @staticmethod
     cdef CCPAttachedBuffer c_from_header(char* header, bint owner=?)
+
+    @staticmethod
+    cdef CCPAttachedBuffer c_from_header_embedded(char* header, const void* parent_header)
 
     cdef CCPAttachedBuffer c_alloc_child(self, size_t size)
 
@@ -102,6 +105,9 @@ cdef class CCPBoundBuffer(CCPType):
 
     @staticmethod
     cdef CCPBoundBuffer c_from_header(char* header, bint owner=?)
+
+    @staticmethod
+    cdef CCPBoundBuffer c_from_header_embedded(char* header, const void* parent_header)
 
     cdef CCPBoundBuffer c_alloc_child(self, size_t size)
 
