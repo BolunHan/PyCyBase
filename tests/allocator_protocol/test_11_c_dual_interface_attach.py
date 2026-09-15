@@ -2,6 +2,13 @@ import subprocess
 import sys
 import unittest
 
+from cbase.allocator_protocol.c_dual_interface import (
+    CCPAttachedBuffer,
+    CCPDualInterfaceTestToolkit,
+)
+
+TK = CCPDualInterfaceTestToolkit
+
 
 class TestCCPAttachmentProtocol(unittest.TestCase):
     """Contract: the CCP attachment protocol binds a wrapper through an
@@ -25,6 +32,10 @@ class TestCCPAttachmentProtocol(unittest.TestCase):
         - manual detach releases only the binding (header stays intact);
           unattached and NULL-header wrappers dealloc / raise gracefully.
         - bound and attached wrappers coexist on the same block.
+        - address: the wrapper's OWN header address — the block start for
+          a block-start attach, the interior pointer for an embedded
+          attach — and 'NULL' when detached; ``embedded`` reports which of
+          the two it is (BufferError when detached).
 
     Oracle: the child process must exit 0 with no "[AP_ALLOC_VIGILANT] ERROR"
     and no "Exception ignored" on stderr (failures segfault (139) or abort
@@ -123,6 +134,7 @@ class TestCCPAttachmentProtocol(unittest.TestCase):
             "owner.values = b'0123456789'\n"
             "entry = CCPDualInterfaceTestToolkit.attached_embedded_from(owner, 3)\n"
             "assert CCPDualInterfaceTestToolkit.attached_header_addr(entry) == CCPDualInterfaceTestToolkit.attached_header_addr(owner) + 3\n"
+            "assert int(entry.address, 16) == CCPDualInterfaceTestToolkit.attached_header_addr(entry)\n"
             "assert entry.values == b'3456789'\n"
             "entry.values = b'xyz'\n"
             "assert owner.values == b'012xyz' + b'\\x00' * 10\n"
@@ -320,6 +332,7 @@ class TestCCPAttachmentProtocol(unittest.TestCase):
             "owner.values = b'01234567'\n"
             "entry = CCPDualInterfaceTestToolkit.c_from_header_embedded(CCPDualInterfaceTestToolkit.header_addr(owner) + 3, CCPDualInterfaceTestToolkit.header_addr(owner))\n"
             "assert CCPDualInterfaceTestToolkit.header_addr(entry) == CCPDualInterfaceTestToolkit.header_addr(owner) + 3\n"
+            "assert int(entry.address, 16) == CCPDualInterfaceTestToolkit.header_addr(entry)\n"
             "assert entry.values == b'34567'\n"
             "entry.values = b'zz'\n"
             "assert owner.values == b'012zz' + b'\\x00' * 3\n"
@@ -337,6 +350,7 @@ class TestCCPAttachmentProtocol(unittest.TestCase):
             "owner.values = b'01234567'\n"
             "entry = CCPDualInterfaceTestToolkit.attached_c_from_header_embedded(CCPDualInterfaceTestToolkit.attached_header_addr(owner) + 3, CCPDualInterfaceTestToolkit.attached_header_addr(owner))\n"
             "assert CCPDualInterfaceTestToolkit.attached_header_addr(entry) == CCPDualInterfaceTestToolkit.attached_header_addr(owner) + 3\n"
+            "assert int(entry.address, 16) == CCPDualInterfaceTestToolkit.attached_header_addr(entry)\n"
             "assert entry.values == b'34567'\n"
             "entry.values = b'zz'\n"
             "assert owner.values == b'012zz' + b'\\x00' * 3\n"
@@ -380,6 +394,116 @@ class TestCCPAttachmentProtocol(unittest.TestCase):
             "entry = CCPDualInterfaceTestToolkit.attached_c_from_header_embedded(CCPDualInterfaceTestToolkit.attached_header_addr(owner) + 1, CCPDualInterfaceTestToolkit.attached_header_addr(owner))\n"
             "CCPDualInterfaceTestToolkit.attached_ccp_attach_embedded(entry, CCPDualInterfaceTestToolkit.attached_header_addr(owner))\n"
         )
+
+
+class TestCCPAttachedAddressContract(unittest.TestCase):
+    """Contract: ``CCPAttachedBuffer.address`` reports the wrapper's OWN
+    bound C header — read from the header field slot at
+    ``(char*)<PyObject*>self + ccp_ctx.ccp_header_offset``, the same slot
+    the FREE pass nulls — NOT the attached protocol's buffer. The two
+    coincide for a block-start attach and DIFFER for an embedded attach,
+    where the protocol belongs to the PARENT block while the header is an
+    interior pointer.
+
+    Expected behavior:
+        - owned / block-start view / child block: address == the wrapper's
+          header address;
+        - embedded: address == parent block start + index, and != the
+          parent's own address (regression guard: the property used to
+          report the parent's block);
+        - manual detach reports 'NULL' while the header stays intact;
+        - husked and never-attached wrappers report 'NULL', reads give
+          None and writes raise BufferError.
+
+    Oracle: the toolkit's attached_header_addr() is the C-side ground
+    truth of the header field; address is parsed back from its hex string.
+    """
+
+    def test_00_owned_and_view_report_the_block_start(self) -> None:
+        """An owned wrapper and a block-start view report the block start."""
+        owner = CCPAttachedBuffer(16)
+        view = TK.attached_c_from_header(TK.attached_header_addr(owner), False)
+
+        self.assertEqual(int(owner.address, 16), TK.attached_header_addr(owner))
+        self.assertEqual(int(view.address, 16), TK.attached_header_addr(view))
+        self.assertEqual(TK.attached_header_addr(view), TK.attached_header_addr(owner))
+
+    def test_01_embedded_reports_the_interior_pointer(self) -> None:
+        """An embedded wrapper reports its own interior pointer — not the
+        parent block its attachment protocol belongs to."""
+        owner = CCPAttachedBuffer(16)
+        entry = TK.attached_embedded_from(owner, 3)
+        owner_addr = TK.attached_header_addr(owner)
+
+        self.assertEqual(TK.attached_header_addr(entry), owner_addr + 3)
+        self.assertEqual(int(entry.address, 16), TK.attached_header_addr(entry))
+        self.assertNotEqual(int(entry.address, 16), owner_addr)
+
+    def test_02_child_block_reports_its_own_start(self) -> None:
+        """A child block reports its own start, not its parent's."""
+        parent = CCPAttachedBuffer(64)
+        child = parent.alloc_child(16)
+
+        self.assertEqual(int(child.address, 16), TK.attached_header_addr(child))
+        self.assertNotEqual(TK.attached_header_addr(child), TK.attached_header_addr(parent))
+
+    def test_03_husk_and_never_attached_report_null(self) -> None:
+        """Husked wrappers (owner freed) and never-attached wrappers report
+        'NULL'."""
+        owner = CCPAttachedBuffer(16)
+        view = TK.attached_c_from_header(TK.attached_header_addr(owner), False)
+        entry = TK.attached_embedded_from(owner, 3)
+        never_attached = TK.attached_new_unbound()
+
+        owner.free_owned()
+
+        for wrapper in (owner, view, entry, never_attached):
+            self.assertEqual(wrapper.address, 'NULL')
+
+    def test_04_manual_detach_nulls_address_keeps_header(self) -> None:
+        """A manual detach releases the binding only: address reports
+        'NULL' while the header field itself stays intact."""
+        owner = CCPAttachedBuffer(16)
+        view = TK.attached_c_from_header(TK.attached_header_addr(owner), False)
+        view_addr = TK.attached_header_addr(view)
+
+        TK.attached_ccp_detach(view)
+
+        self.assertEqual(view.address, 'NULL')
+        with self.assertRaises(BufferError):
+            view.embedded
+        self.assertEqual(TK.attached_header_addr(view), view_addr)
+
+    def test_05_husk_reads_none_and_rejects_writes(self) -> None:
+        """A husked attached wrapper reads None and refuses writes."""
+        owner = CCPAttachedBuffer(16)
+        entry = TK.attached_embedded_from(owner, 2)
+
+        owner.free_owned()
+
+        self.assertIsNone(entry.values)
+        with self.assertRaises(BufferError):
+            entry.values = b'ab'
+
+    def test_06_embedded_flag_distinguishes_interior_headers(self) -> None:
+        """The embedded flag marks interior-pointer attaches: False for
+        every block-start role (owned, view, child), True for an embedded
+        entry — and BufferError once detached (husked or never attached)."""
+        owner = CCPAttachedBuffer(64)
+        view = TK.attached_c_from_header(TK.attached_header_addr(owner), False)
+        child = owner.alloc_child(16)
+        entry = TK.attached_embedded_from(owner, 3)
+
+        self.assertFalse(owner.embedded)
+        self.assertFalse(view.embedded)
+        self.assertFalse(child.embedded)
+        self.assertTrue(entry.embedded)
+
+        owner.free_owned()
+
+        for wrapper in (owner, view, entry, child, TK.attached_new_unbound()):
+            with self.assertRaises(BufferError):
+                wrapper.embedded
 
 
 if __name__ == '__main__':

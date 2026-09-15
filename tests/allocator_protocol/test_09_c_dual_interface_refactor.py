@@ -2,6 +2,13 @@ import subprocess
 import sys
 import unittest
 
+from cbase.allocator_protocol.c_dual_interface import (
+    CCPBoundBuffer,
+    CCPDualInterfaceTestToolkit,
+)
+
+TK = CCPDualInterfaceTestToolkit
+
 
 class TestCCPDualInterfaceTestToolkit(unittest.TestCase):
     """Contract: CCPBoundBuffer supports all three binding scenarios —
@@ -29,6 +36,10 @@ class TestCCPDualInterfaceTestToolkit(unittest.TestCase):
           silently.
         - error-proof: an unbound wrapper reports values None, and
           binding it raises BufferError.
+        - address: the wrapper's OWN header address — the block start for
+          a block-start bind, the interior pointer for an embedded bind —
+          and 'NULL' when unbound; ``embedded`` reports which of the two
+          it is (BufferError when unbound).
 
     Oracle: the child process must exit 0 with no "[AP_ALLOC_VIGILANT] ERROR"
     and no "Exception ignored" on stderr (failures segfault (139) or abort
@@ -127,6 +138,7 @@ class TestCCPDualInterfaceTestToolkit(unittest.TestCase):
             "owner.values = b'0123456789'\n"
             "entry = CCPDualInterfaceTestToolkit.embedded_from(owner, 3)\n"
             "assert CCPDualInterfaceTestToolkit.header_addr(entry) == CCPDualInterfaceTestToolkit.header_addr(owner) + 3\n"
+            "assert int(entry.address, 16) == CCPDualInterfaceTestToolkit.header_addr(entry)\n"
             "assert entry.values == b'3456789'\n"
             "entry.values = b'xyz'\n"
             "assert owner.values == b'012xyz' + b'\\x00' * 10\n"
@@ -159,6 +171,7 @@ class TestCCPDualInterfaceTestToolkit(unittest.TestCase):
             "owner = CCPBoundBuffer(8)\n"
             "owner.values = b'01234567'\n"
             "entry = CCPDualInterfaceTestToolkit.c_from_header_embedded(CCPDualInterfaceTestToolkit.header_addr(owner) + 3, CCPDualInterfaceTestToolkit.header_addr(owner))\n"
+            "assert int(entry.address, 16) == CCPDualInterfaceTestToolkit.header_addr(owner) + 3\n"
             "assert entry.values == b'34567'\n"
             "entry.values = b'zz'\n"
             "assert owner.values == b'012zz' + b'\\x00' * 3\n"
@@ -281,6 +294,156 @@ class TestCCPDualInterfaceTestToolkit(unittest.TestCase):
             "entry = CCPDualInterfaceTestToolkit.c_from_header_embedded(CCPDualInterfaceTestToolkit.header_addr(owner) + 1, CCPDualInterfaceTestToolkit.header_addr(owner))\n"
             "CCPDualInterfaceTestToolkit.ccp_bind_embedded(entry, CCPDualInterfaceTestToolkit.header_addr(owner))\n"
         )
+
+
+class TestCCPAddressContract(unittest.TestCase):
+    """Contract: ``CCPType.address`` reports the wrapper's OWN bound C
+    header — read from the header field slot at
+    ``(char*)<PyObject*>self + ccp_header_offset``, the same slot the FREE
+    pass nulls — NOT the bound protocol's buffer. The two coincide for a
+    block-start bind and DIFFER for an embedded bind, where the protocol
+    belongs to the PARENT block while the header is an interior pointer.
+
+    Expected behavior:
+        - owned / block-start view / child block: address == header_addr.
+        - embedded: address == parent block start + index, and != the
+          parent's own address (regression guard: the property used to
+          report the parent's block).
+        - husked, never-bound and manually unbound wrappers report 'NULL';
+          a manual unbind leaves the header field itself intact.
+
+    Oracle: the toolkit's header_addr() is the C-side ground truth of the
+    header field; address is parsed back from its hex string.
+    """
+
+    def test_00_owned_and_view_report_the_block_start(self) -> None:
+        """An owned wrapper and a block-start view report the block start."""
+        owner = CCPBoundBuffer(16)
+        view = TK.c_from_header(TK.header_addr(owner), False)
+
+        self.assertEqual(int(owner.address, 16), TK.header_addr(owner))
+        self.assertEqual(int(view.address, 16), TK.header_addr(view))
+        self.assertEqual(TK.header_addr(view), TK.header_addr(owner))
+
+    def test_01_embedded_reports_the_interior_pointer(self) -> None:
+        """An embedded wrapper reports its own interior pointer — not the
+        parent block its binding protocol belongs to."""
+        owner = CCPBoundBuffer(16)
+        entry = TK.embedded_from(owner, 3)
+        owner_addr = TK.header_addr(owner)
+
+        self.assertEqual(TK.header_addr(entry), owner_addr + 3)
+        self.assertEqual(int(entry.address, 16), TK.header_addr(entry))
+        self.assertNotEqual(int(entry.address, 16), owner_addr)
+
+    def test_02_child_block_reports_its_own_start(self) -> None:
+        """A child block reports its own start, not its parent's."""
+        parent = CCPBoundBuffer(64)
+        child = parent.alloc_child(16)
+
+        self.assertEqual(int(child.address, 16), TK.header_addr(child))
+        self.assertNotEqual(TK.header_addr(child), TK.header_addr(parent))
+
+    def test_03_husk_and_never_bound_report_null(self) -> None:
+        """Husked wrappers (owner freed) and never-bound wrappers report
+        'NULL'."""
+        owner = CCPBoundBuffer(16)
+        view = TK.c_from_header(TK.header_addr(owner), False)
+        entry = TK.embedded_from(owner, 3)
+        never_bound = TK.new_unbound()
+
+        owner.free_owned()
+
+        for wrapper in (owner, view, entry, never_bound):
+            self.assertEqual(wrapper.address, 'NULL')
+
+    def test_04_manual_unbind_nulls_address_keeps_header(self) -> None:
+        """A manual unbind releases the binding only: address reports
+        'NULL' while the header field itself stays intact — and the later
+        owner free no longer nulls it (the wrapper is unregistered)."""
+        owner = CCPBoundBuffer(16)
+        view = TK.c_from_header(TK.header_addr(owner), False)
+        view_addr = TK.header_addr(view)
+
+        TK.ccp_unbind(view)
+
+        self.assertEqual(view.address, 'NULL')
+        with self.assertRaises(BufferError):
+            view.embedded
+        self.assertEqual(TK.header_addr(view), view_addr)
+        owner.free_owned()
+        self.assertEqual(TK.header_addr(view), view_addr)
+
+    def test_05_embedded_flag_distinguishes_interior_headers(self) -> None:
+        """The embedded flag marks interior-pointer binds: False for every
+        block-start role (owned, view, child), True for an embedded entry —
+        and BufferError once unbound (husked or never bound)."""
+        owner = CCPBoundBuffer(64)
+        view = TK.c_from_header(TK.header_addr(owner), False)
+        child = owner.alloc_child(16)
+        entry = TK.embedded_from(owner, 3)
+
+        self.assertFalse(owner.embedded)
+        self.assertFalse(view.embedded)
+        self.assertFalse(child.embedded)
+        self.assertTrue(entry.embedded)
+
+        owner.free_owned()
+
+        for wrapper in (owner, view, entry, child, TK.new_unbound()):
+            with self.assertRaises(BufferError):
+                wrapper.embedded
+
+
+class TestCCPBoundBufferValueEdges(unittest.TestCase):
+    """Contract: the values accessor/setter edges of the NUL-terminated
+    byte-string model, plus the size semantics of the binding roles.
+
+    Expected behavior:
+        - a write longer than the buffer truncates to size;
+        - a shorter write zero-pads the remainder;
+        - an empty write raises RuntimeError;
+        - write-after-husk raises BufferError, read-after-husk is None;
+        - embedded_from rejects an out-of-range index with IndexError;
+        - sizes: owned == requested, embedded view == remaining tail.
+
+    Oracle: byte-exact reads and the documented exception types.
+    """
+
+    def test_00_setter_truncates_and_zero_pads(self) -> None:
+        """Over-long writes truncate; short writes zero-pad."""
+        buf = CCPBoundBuffer(8)
+        buf.values = b'x' * 100
+        self.assertEqual(buf.values, b'x' * 8)
+        buf.values = b'ab'
+        self.assertEqual(buf.values, b'ab' + b'\x00' * 6)
+
+    def test_01_setter_rejects_empty_value(self) -> None:
+        """An empty write is rejected."""
+        buf = CCPBoundBuffer(8)
+        with self.assertRaises(RuntimeError):
+            buf.values = b''
+
+    def test_02_husk_reads_none_and_rejects_writes(self) -> None:
+        """A husked wrapper reads None and refuses writes."""
+        buf = CCPBoundBuffer(8)
+        buf.free_owned()
+        self.assertIsNone(buf.values)
+        with self.assertRaises(BufferError):
+            buf.values = b'ab'
+
+    def test_03_sizes_and_embedded_index_guard(self) -> None:
+        """Owned size is the requested size, an embedded view measures the
+        remaining tail, and an out-of-range index raises IndexError."""
+        owner = CCPBoundBuffer(16)
+        owner.values = b'0123456789'
+        entry = TK.embedded_from(owner, 3)
+
+        self.assertEqual(owner.size, 16)
+        self.assertEqual(entry.size, 7)
+        self.assertEqual(entry.values, b'3456789')
+        with self.assertRaises(IndexError):
+            TK.embedded_from(owner, 16)
 
 
 if __name__ == '__main__':

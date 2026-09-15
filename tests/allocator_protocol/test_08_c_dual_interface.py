@@ -41,7 +41,10 @@ class TestCCPBoundBufferLifecycle(unittest.TestCase):
             "from cbase.allocator_protocol.c_dual_interface import CCPBoundBuffer\n"
             "array = CCPBoundBuffer(8)\n"
             "array.self_dealloc()\n"
+            "assert array.address == 'NULL'\n"
+            "assert array.size == 0\n"
             "array.self_dealloc()\n"
+            "assert array.address == 'NULL'\n"
             "del array\n"
         )
 
