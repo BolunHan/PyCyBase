@@ -29,7 +29,7 @@ cdef class CCPType:
         cdef int ret_code = c_ccp_unbind(<PyObject*> self)
         if ret_code == ap_ret_code.AP_OK:
             return
-        raise BufferError(f'[CCP] Failed to unbind embedded from allocator_protocol* {<uintptr_t> self.ap_header:#0x}')
+        raise BufferError(f'[CCP] Failed to unbind from allocator_protocol* {<uintptr_t> self.ap_header:#0x}')
 
     @staticmethod
     cdef inline void ccp_attach(PyObject* py_object, const void** c_header, ccp_ctx* ccp, void* dealloc_fn) except *:
@@ -56,7 +56,23 @@ cdef class CCPType:
         def __get__(self):
             if not self.ap_header:
                 return 'NULL'
-            return f'{<uintptr_t> self.ap_header.buf:#0x}'
+            cdef char* py_object = <char*> <PyObject*> self
+            cdef const void** c_header_slot = <const void**> (py_object + self.ccp_header_offset)
+            cdef const void* c_header = c_header_slot[0]
+            if not c_header:
+                return 'NULL'
+            return f'{<uintptr_t> c_header:#0x}'
+
+    property embedded:
+        def __get__(self):
+            if not self.ap_header:
+                raise BufferError('Not initialized!')
+            cdef char* py_object = <char*> <PyObject*> self
+            cdef const void** c_header_slot = <const void**> (py_object + self.ccp_header_offset)
+            cdef const void* c_header = c_header_slot[0]
+            if not c_header:
+                raise BufferError('Not Attached!')
+            return (<uintptr_t> c_header) != (<uintptr_t> self.ap_header.buf)
 
 
 cdef class BoundBuffer:
@@ -287,7 +303,23 @@ cdef class CCPAttachedBuffer(BoundBuffer):
         def __get__(self):
             if not self.ccp_ctx.ap_header:
                 return 'NULL'
-            return f'{<uintptr_t> self.ccp_ctx.ap_header.buf:#0x}'
+            cdef char* py_object = <char*> <PyObject*> self
+            cdef const void** c_header_slot = <const void**> (py_object + self.ccp_ctx.ccp_header_offset)
+            cdef const void* c_header = c_header_slot[0]
+            if not c_header:
+                return 'NULL'
+            return f'{<uintptr_t> c_header:#0x}'
+
+    property embedded:
+        def __get__(self):
+            if not self.ccp_ctx.ap_header:
+                raise BufferError('Not initialized!')
+            cdef char* py_object = <char*> <PyObject*> self
+            cdef const void** c_header_slot = <const void**> (py_object + self.ccp_ctx.ccp_header_offset)
+            cdef const void* c_header = c_header_slot[0]
+            if not c_header:
+                raise BufferError('Not Attached!')
+            return (<uintptr_t> c_header) != (<uintptr_t> self.ccp_ctx.ap_header.buf)
 
 
 cdef class CCPDualInterfaceTestToolkit:

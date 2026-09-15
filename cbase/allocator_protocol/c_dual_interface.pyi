@@ -1,5 +1,5 @@
 from ctypes import POINTER, c_void_p
-from typing import Annotated, Self
+from typing import Annotated, Any, Self
 
 # Type-hint-only helpers for the raw C pointer arguments of the internal
 # cdef binding methods — defined here, never imported elsewhere.
@@ -36,18 +36,9 @@ class CCPType:
     helpers are cimport-callable from Cython modules).
     """
 
-    @property
-    def address(self) -> str:
-        """Buffer address of the bound allocator protocol.
-
-        Returns:
-            The buffer address as a hex string, or ``'NULL'`` when unbound.
-        """
-        ...
-
     # -- cython internal cdef methods (documented exception) ---------------
 
-    def __ccp_dealloc__(self) -> None:
+    def __ccp_dealloc__(self: CCPType | Any) -> None:
         """**cython internal** Extra-teardown hook fired by the FREE pass.
 
         A ``cdef`` override runs when the bound/attached buffer is freed,
@@ -190,6 +181,45 @@ class CCPType:
 
         Raises:
             BufferError: If the callback could not be unregistered.
+        """
+        ...
+
+    @property
+    def address(self) -> str:
+        """Address of the wrapper's own bound C header, as a hex string.
+
+        Read from the header field slot located at
+        ``(char*)<PyObject*>self + ccp_header_offset`` — the same slot the
+        FREE pass nulls — so the accessor is layout-agnostic across
+        subclasses: the block start for a block-start ``ccp_bind``, the
+        interior pointer for an embedded ``ccp_bind_embedded`` bind. For
+        embedded binds this deliberately differs from the bound protocol's
+        buffer, which is the PARENT block start.
+
+        Returns:
+            The header address as a hex string, or ``'NULL'`` when the
+            binding is released (never bound, husked, unbound manually) or
+            the header slot itself holds NULL.
+        """
+        ...
+
+    @property
+    def embedded(self) -> bool:
+        """Whether this wrapper is bound to an INTERIOR pointer instead of a
+        block start.
+
+        Compares the wrapper's own header (read from the header field slot)
+        against the bound protocol's buffer — its block start: equal means a
+        block-start ``ccp_bind``, different means an embedded
+        ``ccp_bind_embedded`` (the protocol belongs to the parent block; the
+        header points inside it).
+
+        Returns:
+            ``True`` for an embedded bind, ``False`` for a block-start bind.
+
+        Raises:
+            BufferError: If the wrapper is unbound (never bound, husked, or
+                unbound manually) or its header slot holds NULL.
         """
         ...
 
@@ -345,11 +375,43 @@ class CCPAttachedBuffer(BoundBuffer):
 
     @property
     def address(self) -> str:
-        """Buffer address of the attached allocator protocol.
+        """Address of the attached wrapper's own bound C header, as a hex
+        string.
+
+        Read from the header field slot located at
+        ``(char*)<PyObject*>self + ccp_ctx.ccp_header_offset`` — the same
+        slot the FREE pass nulls — so the accessor is layout-agnostic
+        across attached classes: the block start for a block-start
+        ``ccp_attach``, the interior pointer for an embedded
+        ``ccp_attach_embedded`` attach. For embedded attaches this
+        deliberately differs from the attached protocol's buffer, which is
+        the PARENT block start.
 
         Returns:
-            The buffer address as a hex string, or ``'NULL'`` when
-            detached.
+            The header address as a hex string, or ``'NULL'`` when the
+            attachment is released (never attached, husked, detached
+            manually) or the header slot itself holds NULL.
+        """
+        ...
+
+    @property
+    def embedded(self) -> bool:
+        """Whether this wrapper is attached to an INTERIOR pointer instead
+        of a block start.
+
+        Compares the wrapper's own header (read from the header field slot)
+        against the attached protocol's buffer — its block start: equal
+        means a block-start ``ccp_attach``, different means an embedded
+        ``ccp_attach_embedded`` (the protocol belongs to the parent block;
+        the header points inside it).
+
+        Returns:
+            ``True`` for an embedded attach, ``False`` for a block-start
+            attach.
+
+        Raises:
+            BufferError: If the wrapper is detached (never attached, husked,
+                or detached manually) or its header slot holds NULL.
         """
         ...
 
@@ -381,6 +443,12 @@ class CCPBoundBuffer(CCPType):
 
     def self_dealloc(self) -> Self:
         """Free the buffer immediately and invalidate every bound wrapper.
+
+        The wrapper must hold a BLOCK START: the header is dereferenced as
+        an allocator protocol, so calling this on an embedded
+        (interior-pointer) wrapper aborts under ``AP_ALLOC_VIGILANT``. A
+        non-owning view may call it to free the block it points at — every
+        wrapper bound to that block is husked with it.
 
         Returns:
             The instance itself; afterwards the wrapper is unbound, its
