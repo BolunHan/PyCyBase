@@ -17,11 +17,14 @@ from .c_bytemap cimport (
     c_bytemap_ex_new, c_bytemap_ex_clear, c_bytemap_ex_free,
     c_bytemap_ex_register_callback, c_bytemap_ex_unregister_callback,
     c_bytemap_ex_get, c_bytemap_ex_get_ptr, c_bytemap_ex_contains,
-    c_bytemap_ex_rehash, c_bytemap_ex_set, c_bytemap_ex_pop, c_bytemap_ex_pop_ptr,
+    c_bytemap_ex_rehash, c_bytemap_ex_set, c_bytemap_ex_set_default,
+    c_bytemap_ex_pop,
     c_bytemap_ex_len, c_bytemap_ex_clone,
 
-    c_bytemap_ex_set_double, c_bytemap_ex_get_double, c_bytemap_ex_pop_double,
-    c_bytemap_ex_set_ssize_t, c_bytemap_ex_get_ssize_t, c_bytemap_ex_pop_ssize_t,
+    c_bytemap_ex_set_double, c_bytemap_ex_set_default_double,
+    c_bytemap_ex_get_double, c_bytemap_ex_pop_double,
+    c_bytemap_ex_set_ssize_t, c_bytemap_ex_set_default_ssize_t,
+    c_bytemap_ex_get_ssize_t, c_bytemap_ex_pop_ssize_t,
 
     c_bytemap_new, c_bytemap_clear, c_bytemap_free,
     c_bytemap_register_callback, c_bytemap_unregister_callback,
