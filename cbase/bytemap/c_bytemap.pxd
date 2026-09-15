@@ -107,16 +107,18 @@ cdef extern from "cbase/bytemap/c_bytemap.h":
     int c_bytemap_ex_contains(const bytemap* bmap, const char* key, size_t key_len) noexcept nogil
     int c_bytemap_ex_rehash(bytemap* bmap, size_t new_capacity, uint64_t seq_id) noexcept nogil
     int c_bytemap_ex_set(bytemap* bmap, const char* key, size_t key_len, const char* value, size_t value_len, uint64_t seq_id, bytemap_entry** out) noexcept nogil
+    int c_bytemap_ex_set_default(bytemap* bmap, const char* key, size_t key_len, const char* value, size_t value_len, uint64_t seq_id, char** out, size_t* out_len) noexcept nogil
     int c_bytemap_ex_pop(bytemap* bmap, const char* key, size_t key_len, uint64_t seq_id, char* out, size_t* out_len) noexcept nogil
-    int c_bytemap_ex_pop_ptr(bytemap* bmap, const char* key, size_t key_len, uint64_t seq_id, char** out, size_t* out_len) noexcept nogil
     size_t c_bytemap_ex_len(const bytemap* bmap) noexcept nogil
     bytemap* c_bytemap_ex_clone(const bytemap* src, allocator_protocol* allocator) noexcept nogil
 
     int c_bytemap_ex_set_double(bytemap* bmap, const char* key, size_t key_len, double value, uint64_t seq_id) noexcept nogil
+    int c_bytemap_ex_set_default_double(bytemap* bmap, const char* key, size_t key_len, double value, uint64_t seq_id, double* out) noexcept nogil
     int c_bytemap_ex_get_double(const bytemap* bmap, const char* key, size_t key_len, double* out) noexcept nogil
     int c_bytemap_ex_pop_double(bytemap* bmap, const char* key, size_t key_len, uint64_t seq_id, double* out) noexcept nogil
 
     int c_bytemap_ex_set_ssize_t(bytemap* bmap, const char* key, size_t key_len, ssize_t value, uint64_t seq_id) noexcept nogil
+    int c_bytemap_ex_set_default_ssize_t(bytemap* bmap, const char* key, size_t key_len, ssize_t value, uint64_t seq_id, ssize_t* out) noexcept nogil
     int c_bytemap_ex_get_ssize_t(const bytemap* bmap, const char* key, size_t key_len, ssize_t* out) noexcept nogil
     int c_bytemap_ex_pop_ssize_t(bytemap* bmap, const char* key, size_t key_len, uint64_t seq_id, ssize_t* out) noexcept nogil
 
@@ -185,6 +187,8 @@ cdef class ByteMapEx(_ByteMapBase):
 
     cdef void c_set(self, str key, bytes value)
 
+    cdef bytes c_set_default(self, str key, bytes value)
+
     cdef bytes c_pop(self, str key)
 
     cdef bint c_contains(self, str key)
@@ -198,6 +202,8 @@ cdef class ByteMapExDouble(_ByteMapBase):
     cdef double c_get_double(self, str key)
 
     cdef void c_set_double(self, str key, double value)
+
+    cdef double c_set_default_double(self, str key, double value)
 
     cdef double c_pop_double(self, str key)
 

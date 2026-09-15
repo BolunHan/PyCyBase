@@ -166,16 +166,18 @@ static inline int            c_bytemap_ex_get_ptr(const bytemap* map, const char
 static inline int            c_bytemap_ex_contains(const bytemap* map, const char* key, size_t key_len);
 static inline int            c_bytemap_ex_rehash(bytemap* map, size_t new_capacity, uint64_t seq_id);
 static inline int            c_bytemap_ex_set(bytemap* map, const char* key, size_t key_len, const char* value, size_t value_len, uint64_t seq_id, bytemap_entry** out);
+static inline int            c_bytemap_ex_set_default(bytemap* map, const char* key, size_t key_len, const char* value, size_t value_len, uint64_t seq_id, char** out, size_t* out_len);
 static inline int            c_bytemap_ex_pop(bytemap* map, const char* key, size_t key_len, uint64_t seq_id, char* out, size_t* out_len);
-static inline int            c_bytemap_ex_pop_ptr(bytemap* map, const char* key, size_t key_len, uint64_t seq_id, char** out, size_t* out_len);
 static inline size_t         c_bytemap_ex_len(const bytemap* map);
 static inline bytemap*       c_bytemap_ex_clone(const bytemap* src, allocator_protocol* allocator);
 
 static inline int            c_bytemap_ex_set_double(bytemap* map, const char* key, size_t key_len, double value, uint64_t seq_id);
+static inline int            c_bytemap_ex_set_default_double(bytemap* map, const char* key, size_t key_len, double value, uint64_t seq_id, double* out);
 static inline int            c_bytemap_ex_get_double(const bytemap* map, const char* key, size_t key_len, double* out);
 static inline int            c_bytemap_ex_pop_double(bytemap* map, const char* key, size_t key_len, uint64_t seq_id, double* out);
 
 static inline int            c_bytemap_ex_set_ssize_t(bytemap* map, const char* key, size_t key_len, ssize_t value, uint64_t seq_id);
+static inline int            c_bytemap_ex_set_default_ssize_t(bytemap* map, const char* key, size_t key_len, ssize_t value, uint64_t seq_id, ssize_t* out);
 static inline int            c_bytemap_ex_get_ssize_t(const bytemap* map, const char* key, size_t key_len, ssize_t* out);
 static inline int            c_bytemap_ex_pop_ssize_t(bytemap* map, const char* key, size_t key_len, uint64_t seq_id, ssize_t* out);
 
@@ -612,6 +614,114 @@ probe:
     return BYTEMAP_OK;
 }
 
+/**
+ * @brief Get the value stored for `key`, inserting `value` first if the key is absent.
+ *
+ * "Get or insert" in a single probe: the key is hashed once and the probe walk
+ * either finds the live entry or lands on the slot to write, so a miss costs one
+ * hash and one probe walk instead of a get followed by a separate set.
+ * An existing entry is NEVER overwritten — its stored value is handed back as-is.
+ *
+ * The ADDED callback fires only when the key was absent; a hit mutates nothing.
+ *
+ * @param map        Target map.
+ * @param key        Key bytes (NUL-terminated when `key_len` is 0).
+ * @param key_len    Key length in bytes; 0 means "use strlen(key)".
+ * @param value      Default value bytes, written only when the key is absent.
+ * @param value_len  Length of `value`; must be <= map->slot_capacity.
+ * @param seq_id     Sequence ID for callback self-suppression.
+ * @param out        Receives a pointer to the stored value bytes (NULL-safe).
+ *                   Valid until the entry is removed or the map rehashes.
+ * @param out_len    Receives the stored value length (NULL-safe).
+ * @return           BYTEMAP_OK on hit or insert; BYTEMAP_ERR_* otherwise.
+ */
+static inline int c_bytemap_ex_set_default(bytemap* map, const char* key, size_t key_len, const char* value, size_t value_len, uint64_t seq_id, char** out, size_t* out_len) {
+    if (!map) return BYTEMAP_ERR_INVALID_BUF;
+    if (!key) return BYTEMAP_ERR_INVALID_KEY;
+    if (!value || value_len > map->slot_capacity) return BYTEMAP_ERR_INVALID_VALUE;
+    if (key_len == 0) key_len = strlen(key);
+    if (key_len == 0) return BYTEMAP_ERR_INVALID_KEY;
+
+    // The salt is fixed for the map's lifetime, so the hash is computed exactly once
+    // here: the rehash below only relocates entries, it never re-keys them.
+    uint64_t hash;
+    c_bytemap_hash(map, key, key_len, &hash);
+
+probe:
+    size_t         capacity = map->capacity;
+    size_t         idx = hash % capacity;
+    size_t         start = idx;
+    bytemap_entry* tombstone = NULL;
+    bytemap_entry* entry = c_bytemap_entry_at(map, idx);
+
+    while (entry->occupied || entry->removed) {
+        if (!entry->occupied && !tombstone) tombstone = entry;
+        else if (entry->occupied && entry->key_length == key_len && memcmp(entry->key, key, key_len) == 0) {
+            // Hit — the stored value wins, nothing is written and no callback fires.
+            if (out) *out = entry->value;
+            if (out_len) *out_len = entry->value_length;
+            return BYTEMAP_OK;
+        }
+        idx = (idx + 1) % capacity;
+        entry = c_bytemap_entry_next(map, entry);
+        if (idx == start) {
+            if (tombstone) {
+                entry = tombstone;
+                break;
+            }
+
+            size_t new_cap;
+            if (capacity == 0) new_cap = MIN_BYTEMAP_CAPACITY;
+            else if (capacity > MAX_BYTEMAP_CAPACITY / BYTEMAP_GROWTH_FACTOR) new_cap = MAX_BYTEMAP_CAPACITY;
+            else new_cap = capacity * BYTEMAP_GROWTH_FACTOR;
+            if (new_cap == capacity) return BYTEMAP_ERR_FULL;
+            int ret_code = c_bytemap_ex_rehash(map, new_cap, seq_id);
+            if (ret_code != BYTEMAP_OK) return ret_code;
+            goto probe;
+        }
+    }
+
+    if (tombstone) entry = tombstone;
+    else {
+        if (map->occupied * 2 >= capacity) {
+            size_t new_cap;
+            if (capacity == 0) new_cap = MIN_BYTEMAP_CAPACITY;
+            else if (capacity > MAX_BYTEMAP_CAPACITY / BYTEMAP_GROWTH_FACTOR) new_cap = MAX_BYTEMAP_CAPACITY;
+            else new_cap = capacity * BYTEMAP_GROWTH_FACTOR;
+
+            if (new_cap != capacity) {
+                int ret_code = c_bytemap_ex_rehash(map, new_cap, seq_id);
+                if (ret_code != BYTEMAP_OK) return ret_code;
+                goto probe;
+            }
+        }
+
+        map->occupied++;
+    }
+
+    const char* key_copy = c_bytemap_clone_key(map, key, key_len);
+    if (!key_copy) return BYTEMAP_ERR_OOM;
+
+    entry->key = key_copy;
+    entry->key_length = key_len;
+    memcpy(entry->value, value, value_len);
+    entry->value_length = value_len;
+    entry->hash = hash;
+    entry->occupied = true;
+    entry->removed = false;
+
+    entry->prev = map->last;
+    entry->next = NULL;
+    if (map->last) map->last->next = entry;
+    else map->first = entry;
+    map->last = entry;
+    map->size++;
+    if (out) *out = entry->value;
+    if (out_len) *out_len = value_len;
+    c_bytemap_invoke_callbacks(BYTEMAP_CALLBACK_EVENT_ADDED, map, entry->key, key_len, entry->value, value_len, seq_id);
+    return BYTEMAP_OK;
+}
+
 static inline int c_bytemap_ex_pop(bytemap* map, const char* key, size_t key_len, uint64_t seq_id, char* out, size_t* out_len) {
     if (!map || !key) return BYTEMAP_ERR_INVALID_BUF;
     if (key_len == 0) key_len = strlen(key);
@@ -629,43 +739,6 @@ static inline int c_bytemap_ex_pop(bytemap* map, const char* key, size_t key_len
         if (!entry->occupied && !entry->removed) break;
         if (entry->occupied && entry->key_length == key_len && memcmp(entry->key, key, key_len) == 0) {
             if (out) memcpy(out, entry->value, entry->value_length);
-            if (out_len) *out_len = entry->value_length;
-
-            if (entry->prev) entry->prev->next = entry->next;
-            else map->first = entry->next;
-            if (entry->next) entry->next->prev = entry->prev;
-            else map->last = entry->prev;
-
-            c_bytemap_free_key(map, (char*) entry->key);
-            memset(entry, 0, entry_size);
-            entry->removed = 1;
-            map->size--;
-            c_bytemap_invoke_callbacks(BYTEMAP_CALLBACK_EVENT_POPPED, map, key, key_len, NULL, 0, seq_id);
-            return BYTEMAP_OK;
-        }
-        idx = (idx + 1) % capacity;
-        if (idx == start) break;
-    }
-    return BYTEMAP_ERR_NOT_FOUND;
-}
-
-static inline int c_bytemap_ex_pop_ptr(bytemap* map, const char* key, size_t key_len, uint64_t seq_id, char** out, size_t* out_len) {
-    if (!map || !key) return BYTEMAP_ERR_INVALID_BUF;
-    if (key_len == 0) key_len = strlen(key);
-    if (key_len == 0) return BYTEMAP_ERR_INVALID_KEY;
-
-    size_t   entry_size = map->entry_size;
-    size_t   capacity = map->capacity;
-    uint64_t hash;
-    c_bytemap_hash(map, key, key_len, &hash);
-    size_t idx = hash % capacity;
-    size_t start = idx;
-
-    while (1) {
-        bytemap_entry* entry = c_bytemap_entry_at(map, idx);
-        if (!entry->occupied && !entry->removed) break;
-        if (entry->occupied && entry->key_length == key_len && memcmp(entry->key, key, key_len) == 0) {
-            if (out) *out = entry->value;
             if (out_len) *out_len = entry->value_length;
 
             if (entry->prev) entry->prev->next = entry->next;
@@ -716,6 +789,13 @@ static inline int c_bytemap_ex_set_double(bytemap* map, const char* key, size_t 
     return c_bytemap_ex_set(map, key, key_len, (const char*) &value, sizeof(double), seq_id, NULL);
 }
 
+static inline int c_bytemap_ex_set_default_double(bytemap* map, const char* key, size_t key_len, double value, uint64_t seq_id, double* out) {
+    char* stored = NULL;
+    int   ret_code = c_bytemap_ex_set_default(map, key, key_len, (const char*) &value, sizeof(double), seq_id, &stored, NULL);
+    if (ret_code == BYTEMAP_OK && out) *out = *(double*) stored;
+    return ret_code;
+}
+
 static inline int c_bytemap_ex_get_double(const bytemap* map, const char* key, size_t key_len, double* out) {
     return c_bytemap_ex_get(map, key, key_len, (char*) out, NULL);
 }
@@ -728,6 +808,13 @@ static inline int c_bytemap_ex_pop_double(bytemap* map, const char* key, size_t 
 
 static inline int c_bytemap_ex_set_ssize_t(bytemap* map, const char* key, size_t key_len, ssize_t value, uint64_t seq_id) {
     return c_bytemap_ex_set(map, key, key_len, (const char*) &value, sizeof(ssize_t), seq_id, NULL);
+}
+
+static inline int c_bytemap_ex_set_default_ssize_t(bytemap* map, const char* key, size_t key_len, ssize_t value, uint64_t seq_id, ssize_t* out) {
+    char* stored = NULL;
+    int   ret_code = c_bytemap_ex_set_default(map, key, key_len, (const char*) &value, sizeof(ssize_t), seq_id, &stored, NULL);
+    if (ret_code == BYTEMAP_OK && out) *out = *(ssize_t*) stored;
+    return ret_code;
 }
 
 static inline int c_bytemap_ex_get_ssize_t(const bytemap* map, const char* key, size_t key_len, ssize_t* out) {

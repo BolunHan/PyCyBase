@@ -1,6 +1,7 @@
 from time import perf_counter
 
 from cpython.bytes cimport PyBytes_AsString, PyBytes_FromStringAndSize, PyBytes_GET_SIZE
+from cpython.mem cimport PyMem_Free, PyMem_Malloc
 from cpython.ref cimport Py_XINCREF
 from cpython.unicode cimport PyUnicode_AsUTF8AndSize, PyUnicode_FromStringAndSize
 from libc.math cimport NAN
@@ -152,6 +153,8 @@ cdef class ByteMapEx(_ByteMapBase):
             raise ValueError('Uninitialized bytemap table')
         elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_KEY:
             raise TypeError(f'Invalid key {key}')
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_VALUE:
+            raise ValueError(f'Value exceeds slot capacity of {self.header.slot_capacity} bytes')
         elif ret_code == bytemap_ret_code.BYTEMAP_ERR_FULL:
             raise MemoryError('Mapping is full')
         elif ret_code == bytemap_ret_code.BYTEMAP_ERR_OOM:
@@ -159,15 +162,47 @@ cdef class ByteMapEx(_ByteMapBase):
         else:
             raise RuntimeError(f'c_bytemap_ex_set failed with err code: {ret_code}')
 
-    cdef bytes c_pop(self, str key):
-        cdef size_t c_str_len = 0
-        cdef const char* c_str = ByteMapEx.c_key_to_string(key, &c_str_len)
+    cdef bytes c_set_default(self, str key, bytes value):
+        cdef size_t key_len = 0
+        cdef const char* key_ptr = ByteMapEx.c_key_to_string(key, &key_len)
+        cdef size_t value_len = 0
+        cdef const char* value_ptr = ByteMapEx.c_value_to_string(value, &value_len)
         cdef size_t out_len = 0
         cdef char* out = NULL
-        cdef int ret_code = c_bytemap_ex_pop_ptr(self.header, c_str, c_str_len, self.seq_id, &out, &out_len)
+        cdef int ret_code = c_bytemap_ex_set_default(self.header, key_ptr, key_len, value_ptr, value_len, self.seq_id, &out, &out_len)
         if ret_code == bytemap_ret_code.BYTEMAP_OK:
             return PyBytes_FromStringAndSize(out, out_len)
         elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_BUF:
+            raise ValueError('Uninitialized bytemap table')
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_KEY:
+            raise TypeError(f'Invalid key {key}')
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_VALUE:
+            raise ValueError(f'Value exceeds slot capacity of {self.header.slot_capacity} bytes')
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_FULL:
+            raise MemoryError('Mapping is full')
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_OOM:
+            raise MemoryError('Out of memory')
+        else:
+            raise RuntimeError(f'c_bytemap_ex_set_default failed with err code: {ret_code}')
+
+    cdef bytes c_pop(self, str key):
+        cdef size_t c_str_len = 0
+        cdef const char* c_str = ByteMapEx.c_key_to_string(key, &c_str_len)
+        # c_bytemap_ex_pop copies the value out before the entry is zeroed, so it needs
+        # a destination buffer — the entry's own value[] is gone by the time we return.
+        cdef size_t out_len = 0
+        cdef char* out = <char*> PyMem_Malloc(self.header.slot_capacity)
+        if out == NULL:
+            raise MemoryError('Failed to allocate the pop buffer')
+        cdef int ret_code
+        try:
+            ret_code = c_bytemap_ex_pop(self.header, c_str, c_str_len, self.seq_id, out, &out_len)
+            if ret_code == bytemap_ret_code.BYTEMAP_OK:
+                return PyBytes_FromStringAndSize(out, out_len)
+        finally:
+            PyMem_Free(out)
+
+        if ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_BUF:
             raise ValueError('Uninitialized bytemap table')
         elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_KEY:
             raise TypeError(f'Invalid key {key}')
@@ -239,25 +274,18 @@ cdef class ByteMapEx(_ByteMapBase):
     def set(self, str key, bytes value):
         return self.c_set(key, value)
 
+    def setdefault(self, str key, object default=NO_DEFAULT):
+        if default is NO_DEFAULT:
+            return self.c_get(key)
+        return self.c_set_default(key, <bytes> default)
+
     def pop(self, str key, bytes default=NO_DEFAULT_BYTES, *):
-        cdef size_t c_str_len = 0
-        cdef const char* c_str = ByteMapEx.c_key_to_string(key, &c_str_len)
-        cdef size_t out_len = 0
-        cdef char* out = NULL
-        cdef int ret_code = c_bytemap_ex_pop_ptr(self.header, c_str, c_str_len, self.seq_id, &out, &out_len)
-        if ret_code == bytemap_ret_code.BYTEMAP_OK:
-            return PyBytes_FromStringAndSize(out, out_len)
-        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_BUF:
-            raise ValueError('Uninitialized bytemap table')
-        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_KEY:
-            raise TypeError(f'Invalid key {key}')
-        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_NOT_FOUND:
+        try:
+            return self.c_pop(key)
+        except KeyError:
             if default is NO_DEFAULT_BYTES:
-                raise KeyError(key)
-            else:
-                return default
-        else:
-            raise RuntimeError(f'c_bytemap_ex_pop failed with err code: {ret_code}')
+                raise
+            return default
 
     def contains(self, str key):
         return self.c_contains(key)
@@ -341,6 +369,24 @@ cdef class ByteMapExDouble(_ByteMapBase):
         else:
             raise RuntimeError(f'c_bytemap_ex_set failed with err code: {ret_code}')
 
+    cdef double c_set_default_double(self, str key, double value):
+        cdef size_t key_len = 0
+        cdef const char* key_ptr = ByteMapEx.c_key_to_string(key, &key_len)
+        cdef double out = 0
+        cdef int ret_code = c_bytemap_ex_set_default_double(self.header, key_ptr, key_len, value, self.seq_id, &out)
+        if ret_code == bytemap_ret_code.BYTEMAP_OK:
+            return out
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_BUF:
+            raise ValueError('Uninitialized bytemap table')
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_KEY:
+            raise TypeError(f'Invalid key {key}')
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_FULL:
+            raise MemoryError('Mapping is full')
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_OOM:
+            raise MemoryError('Out of memory')
+        else:
+            raise RuntimeError(f'c_bytemap_ex_set_default_double failed with err code: {ret_code}')
+
     cdef double c_pop_double(self, str key):
         cdef size_t c_str_len = 0
         cdef const char* c_str = ByteMapEx.c_key_to_string(key, &c_str_len)
@@ -417,6 +463,11 @@ cdef class ByteMapExDouble(_ByteMapBase):
 
     def set(self, str key, double value):
         return self.c_set_double(key, value)
+
+    def setdefault(self, str key, object default=NO_DEFAULT, *):
+        if default is NO_DEFAULT:
+            return self.c_get_double(key)
+        return self.c_set_default_double(key, <double> default)
 
     def pop(self, str key, object default=NO_DEFAULT, *):
         cdef size_t c_str_len = 0
@@ -1118,6 +1169,8 @@ cdef class _BoundByteMapBase(dict):
             raise ValueError('Invalid args')
         elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_KEY:
             raise KeyError(f'Invalid key {py_key}')
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_VALUE:
+            raise ValueError(f'Value exceeds slot capacity of {self.header.slot_capacity} bytes')
         elif ret_code == bytemap_ret_code.BYTEMAP_ERR_FULL:
             raise MemoryError('Mapping is full')
         else:
@@ -1131,9 +1184,7 @@ cdef class _BoundByteMapBase(dict):
         if BP_PyDict_Pop(<PyObject*> self, <PyObject*> py_key, &py_value) < 0:
             PyErr_Clear()
 
-        cdef char* c_value = NULL
-        cdef size_t c_value_len = 0
-        cdef int ret_code = c_bytemap_ex_pop_ptr(self.header, c_key, c_key_len, self.seq_id, &c_value, &c_value_len)
+        cdef int ret_code = c_bytemap_ex_pop(self.header, c_key, c_key_len, self.seq_id, NULL, NULL)
 
         if ret_code == bytemap_ret_code.BYTEMAP_OK:
             if py_value:
@@ -1476,13 +1527,10 @@ cdef class BoundByteSet(set):
     cdef object c_discard(self, object py_key):
         cdef size_t c_key_len
         cdef const char* c_key = self.c_serialize_key(py_key, &c_key_len)
-        cdef char* out = NULL
-        cdef size_t out_len = 0
-
         cdef object py_removed = py_key if py_key in self else None
         set.discard(self, py_key)
 
-        cdef int ret_code = c_bytemap_ex_pop_ptr(self.header, c_key, c_key_len, self.seq_id, &out, &out_len)
+        cdef int ret_code = c_bytemap_ex_pop(self.header, c_key, c_key_len, self.seq_id, NULL, NULL)
 
         if ret_code == bytemap_ret_code.BYTEMAP_OK:
             return py_removed
