@@ -100,8 +100,87 @@ class TestByteMapEx(unittest.TestCase):
 
     def test_07_slot_capacity_enforced(self):
         # Setting a value larger than slot_capacity should raise
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(ValueError):
             self.mapping["big"] = b"x" * 100  # slot_capacity is 32
+
+    def test_08_setdefault_hit_keeps_existing_value(self):
+        """A hit returns the stored value and never overwrites it."""
+        self.mapping["alpha"] = b"stored"
+
+        result = self.mapping.setdefault("alpha", b"incoming")
+
+        self.assertEqual(result, b"stored")
+        self.assertEqual(self.mapping["alpha"], b"stored")
+        self.assertEqual(len(self.mapping), 1)
+
+    def test_09_setdefault_miss_inserts_default(self):
+        """A miss inserts the default and hands it back."""
+        result = self.mapping.setdefault("beta", b"seeded")
+
+        self.assertEqual(result, b"seeded")
+        self.assertEqual(self.mapping["beta"], b"seeded")
+        self.assertIn("beta", self.mapping)
+        self.assertEqual(len(self.mapping), 1)
+
+    def test_10_setdefault_without_default_contract(self):
+        """Omitting the default degrades to a get: hit returns, miss raises, nothing inserted."""
+        self.mapping["gamma"] = b"g"
+
+        self.assertEqual(self.mapping.setdefault("gamma"), b"g")
+
+        with self.assertRaises(KeyError):
+            self.mapping.setdefault("delta")
+        self.assertNotIn("delta", self.mapping)
+        self.assertEqual(len(self.mapping), 1)
+
+    def test_11_setdefault_bulk_growth_and_tombstone_reuse(self):
+        """Insert-through-growth and refill-over-tombstone both land on the right entry."""
+        mapping = ByteMapEx(slot_capacity=16, init_capacity=2)
+
+        for i in range(200):
+            self.assertEqual(mapping.setdefault(f"key_{i:05d}", b"v"), b"v")
+        self.assertEqual(len(mapping), 200)
+
+        for i in range(0, 200, 2):
+            self.assertEqual(mapping.pop(f"key_{i:05d}"), b"v")
+        self.assertEqual(len(mapping), 100)
+
+        for i in range(0, 200, 2):
+            self.assertEqual(mapping.setdefault(f"key_{i:05d}", b"refilled"), b"refilled")
+
+        self.assertEqual(len(mapping), 200)
+        for i in range(200):
+            expected = b"refilled" if i % 2 == 0 else b"v"
+            self.assertEqual(mapping.setdefault(f"key_{i:05d}", b"ignored"), expected)
+
+    def test_12_setdefault_oversized_default_raises(self):
+        """An oversized default is rejected the same way an oversized set is."""
+        with self.assertRaises(ValueError) as ctx:
+            self.mapping.setdefault("big", b"x" * 100)  # slot_capacity is 32
+        self.assertIn("slot capacity of 32", str(ctx.exception))
+        self.assertNotIn("big", self.mapping)
+
+    def test_13_pop_existing_key_returns_value(self):
+        """Popping a live key hands back its stored bytes before the slot is torn down."""
+        payload = {"a": b"1", "b": b"22", "c": b"333"}
+        for key, value in payload.items():
+            self.mapping[key] = value
+
+        for key, value in payload.items():
+            self.assertEqual(self.mapping.pop(key), value)
+            self.assertNotIn(key, self.mapping)
+
+        self.assertEqual(len(self.mapping), 0)
+        self.assertEqual(self.mapping.as_dict, {})
+
+    def test_14_pop_returns_value_at_slot_boundary(self):
+        """A value filling slot_capacity exactly survives the round trip."""
+        exact = b"x" * 32  # slot_capacity is 32
+        self.mapping["full"] = exact
+        self.mapping["tiny"] = b"y"
+
+        self.assertEqual(self.mapping.pop("full"), exact)
+        self.assertEqual(self.mapping.pop("tiny"), b"y")
 
 
 class TestByteMapExDouble(unittest.TestCase):
@@ -220,6 +299,51 @@ class TestByteMapExDouble(unittest.TestCase):
         self.assertAlmostEqual(clone["a"], 1.0)
 
         del clone
+
+    def test_09_setdefault_hit_keeps_existing_value(self):
+        """A hit returns the stored double and never overwrites it."""
+        self.mapping["px"] = 12.5
+
+        result = self.mapping.setdefault("px", 99.0)
+
+        self.assertAlmostEqual(result, 12.5)
+        self.assertAlmostEqual(self.mapping["px"], 12.5)
+        self.assertEqual(len(self.mapping), 1)
+
+    def test_10_setdefault_miss_inserts_default(self):
+        """A miss inserts the default double and hands it back."""
+        result = self.mapping.setdefault("qy", 7.25)
+
+        self.assertAlmostEqual(result, 7.25)
+        self.assertAlmostEqual(self.mapping["qy"], 7.25)
+        self.assertIn("qy", self.mapping)
+        self.assertEqual(len(self.mapping), 1)
+
+    def test_11_setdefault_without_default_contract(self):
+        """Omitting the default degrades to a get: hit returns, miss raises, nothing inserted."""
+        self.mapping["rz"] = -3.5
+
+        self.assertAlmostEqual(self.mapping.setdefault("rz"), -3.5)
+
+        with self.assertRaises(KeyError):
+            self.mapping.setdefault("nope")
+        self.assertNotIn("nope", self.mapping)
+        self.assertEqual(len(self.mapping), 1)
+
+    def test_12_setdefault_bulk_growth_preserves_values(self):
+        """Insert-through-growth keeps every value and hits return the original."""
+        mapping = ByteMapExDouble(init_capacity=2)
+        expected = {}
+
+        for i in range(500):
+            key = f"key_{i:05d}"
+            value = float(i) + 0.25
+            self.assertAlmostEqual(mapping.setdefault(key, value), value)
+            expected[key] = value
+
+        self.assertEqual(len(mapping), len(expected))
+        for key, value in expected.items():
+            self.assertAlmostEqual(mapping.setdefault(key, -1.0), value)
 
 
 class TestBoundByteMapEx(unittest.TestCase):
@@ -373,6 +497,28 @@ class TestBoundByteMapEx(unittest.TestCase):
         import gc
         gc.collect()
         self.assertFalse(bool(view))
+
+    def test_08_raw_setdefault_syncs_bound_view_only_on_miss(self):
+        """A raw setdefault miss raises ADDED and syncs the bound rail; a hit is silent."""
+        src_raw = ByteMapEx(slot_capacity=64)
+        self.mapping.rebind(src_raw)
+
+        self.assertEqual(src_raw.setdefault("fresh", b"seeded"), b"seeded")
+        self.assertEqual(self.mapping["fresh"], b"seeded")
+        self.assertEqual(dict(self.mapping), {"fresh": b"seeded"})
+
+        # A hit must not raise a MODIFIED event — if it did, the bound rail would
+        # have been overwritten with the ignored default.
+        self.assertEqual(src_raw.setdefault("fresh", b"other"), b"seeded")
+        self.assertEqual(dict(self.mapping), {"fresh": b"seeded"})
+
+    def test_09_oversized_value_raises_value_error(self):
+        """A value wider than slot_capacity is a ValueError, not a bare RuntimeError."""
+        with self.assertRaises(ValueError) as ctx:
+            self.mapping["big"] = b"x" * 100  # slot_capacity is 64
+        self.assertIn("slot capacity of 64", str(ctx.exception))
+        self.assertNotIn("big", self.mapping)
+        self.assertEqual(dict(self.mapping), {})
 
 
 class TestBoundByteMapExDouble(unittest.TestCase):
