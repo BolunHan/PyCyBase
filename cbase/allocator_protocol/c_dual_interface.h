@@ -76,7 +76,7 @@ static inline int  c_ccp_detach(PyObject* py_object, ccp_ctx* ccp);
  *
  * The allocator protocol zeroes every allocation it hands out, so a fresh
  * ccp_ctx has ap_header == NULL; a non-NULL ap_header means the wrapper is
- * already bound/attached — a fatal usage error (double bind/attach leaks a
+ * already bound/attached - a fatal usage error (double bind/attach leaks a
  * callback node and double-increfs the block).
  *
  * @param op        The violated operation name (for the error message).
@@ -85,7 +85,7 @@ static inline int  c_ccp_detach(PyObject* py_object, ccp_ctx* ccp);
  */
 static inline void c_ccp_abort_if_bound(const char* op, PyObject* py_object, const ccp_ctx* ccp) {
     if (!ccp->ap_header) return;
-    fprintf(stderr, "[CCP] ERROR: %s on an already-bound wrapper <%p> (allocator_protocol* %p) — bind/attach exactly once, at its one construction path\n", op, (void*) py_object, (void*) ccp->ap_header);
+    fprintf(stderr, "[CCP] ERROR: %s on an already-bound wrapper <%p> (allocator_protocol* %p) - bind/attach exactly once, at its one construction path\n", op, (void*) py_object, (void*) ccp->ap_header);
     abort();
 }
 
