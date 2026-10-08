@@ -1,4 +1,4 @@
-# config_view.pyx — compile-time macro registry for PyCyBase
+# config_view.pyx - compile-time macro registry for PyCyBase
 #
 # Exposes every overridable compile-time constant as a read-only,
 # per-submodule nested mappingproxy (CONFIG_VIEW) so that downstream code

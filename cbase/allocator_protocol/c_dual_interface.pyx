@@ -177,7 +177,7 @@ cdef class CCPBoundBuffer(CCPType):
         instance.header = header
         instance.owner = owner
         instance.size = strlen(header)
-        instance.ccp_bind(&instance.header)          # block start — bind inside
+        instance.ccp_bind(&instance.header)          # block start - bind inside
         return instance
 
     @staticmethod
@@ -186,7 +186,7 @@ cdef class CCPBoundBuffer(CCPType):
         instance.header = header
         instance.owner = False
         instance.size = strlen(header)
-        instance.ccp_bind_embedded(&instance.header, parent_header)   # interior — bind embedded inside
+        instance.ccp_bind_embedded(&instance.header, parent_header)   # interior - bind embedded inside
         return instance
 
     def self_dealloc(self):
@@ -267,7 +267,7 @@ cdef class CCPAttachedBuffer(BoundBuffer):
         instance.header = header
         instance.owner = owner
         instance.size = strlen(header)
-        instance.ccp_attach()              # block start — attach inside
+        instance.ccp_attach()              # block start - attach inside
         return instance
 
     @staticmethod
@@ -277,7 +277,7 @@ cdef class CCPAttachedBuffer(BoundBuffer):
         instance.header = header
         instance.owner = False
         instance.size = strlen(header)
-        instance.ccp_attach_embedded(parent_header)   # interior — attach embedded inside
+        instance.ccp_attach_embedded(parent_header)   # interior - attach embedded inside
         return instance
 
     cdef CCPAttachedBuffer c_alloc_child(self, size_t size):
@@ -410,7 +410,7 @@ cdef class CCPDualInterfaceTestToolkit:
             raise BufferError('buffer was released')
 
         cdef allocator_protocol* protocol = c_ap_protocol_from_ptr(array.header)
-        # c_ap_parent_of returns the parent block start — derive its protocol
+        # c_ap_parent_of returns the parent block start - derive its protocol
         # so all four slots report protocol addresses.
         return (<uintptr_t> c_ap_protocol_from_ptr(c_ap_parent_of(array.header)), <uintptr_t> protocol.first_child,
                 <uintptr_t> protocol.next_sibling, <uintptr_t> protocol.prev_sibling)

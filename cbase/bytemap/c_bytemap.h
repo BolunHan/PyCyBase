@@ -620,7 +620,7 @@ probe:
  * "Get or insert" in a single probe: the key is hashed once and the probe walk
  * either finds the live entry or lands on the slot to write, so a miss costs one
  * hash and one probe walk instead of a get followed by a separate set.
- * An existing entry is NEVER overwritten — its stored value is handed back as-is.
+ * An existing entry is NEVER overwritten - its stored value is handed back as-is.
  *
  * The ADDED callback fires only when the key was absent; a hit mutates nothing.
  *
@@ -657,7 +657,7 @@ probe:
     while (entry->occupied || entry->removed) {
         if (!entry->occupied && !tombstone) tombstone = entry;
         else if (entry->occupied && entry->key_length == key_len && memcmp(entry->key, key, key_len) == 0) {
-            // Hit — the stored value wins, nothing is written and no callback fires.
+            // Hit - the stored value wins, nothing is written and no callback fires.
             if (out) *out = entry->value;
             if (out_len) *out_len = entry->value_length;
             return BYTEMAP_OK;

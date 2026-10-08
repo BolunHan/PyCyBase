@@ -2,7 +2,7 @@ import logging
 import sys
 import time
 
-# logging.WARNING — stable across CPython releases; a C-level constant so the
+# logging.WARNING - stable across CPython releases; a C-level constant so the
 # filter hot path never re-reads the logging module.
 cdef int _WARNING_LEVEL = 30
 
@@ -12,7 +12,7 @@ LOG_LEVEL = logging.INFO
 # Per-name logger singletons: name -> logging.Logger
 cdef dict _loggers = {}
 
-# ANSI escape codes — module-level constants, built once at import time
+# ANSI escape codes - module-level constants, built once at import time
 # instead of on every _get_format() call. The color codes omit the trailing
 # 'm' so the ';7' reverse-video suffix can be appended when select=True.
 cdef str _ANSI_RESET = "\33[0m"
@@ -111,7 +111,7 @@ class DuplicateWarningFilter(logging.Filter):
         if record.levelno != _WARNING_LEVEL:
             return True
 
-        # Fast path: without args getMessage() is just str(msg) — skip the
+        # Fast path: without args getMessage() is just str(msg) - skip the
         # method dispatch. With args the full formatting is unavoidable.
         args = record.args
         message = str(record.msg) if not args else record.getMessage()

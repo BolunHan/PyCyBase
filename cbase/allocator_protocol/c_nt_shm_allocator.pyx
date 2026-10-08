@@ -1,6 +1,6 @@
 """NT-native shared memory allocator (Windows-only).
 
-Provides NtSharedMemoryAllocator — a crude, test-focused wrapper around
+Provides NtSharedMemoryAllocator - a crude, test-focused wrapper around
 c_nt_shm_allocator.h.  Uses Windows kernel objects (CreateFileMappingW,
 MapViewOfFile, named mutexes) instead of POSIX SHM.
 """

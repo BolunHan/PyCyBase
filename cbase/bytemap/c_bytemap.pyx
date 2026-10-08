@@ -17,7 +17,7 @@ cdef bytes NO_DEFAULT_BYTES = b''
 
 
 # ============================================================
-#  _ByteMapBase — common base for all ByteMap variants
+#  _ByteMapBase - common base for all ByteMap variants
 # ============================================================
 
 cdef class _ByteMapBase:
@@ -93,7 +93,7 @@ cdef class _ByteMapBase:
 
 
 # ============================================================
-#  ByteMapEx — str → bytes mapping
+#  ByteMapEx - str -> bytes mapping
 # ============================================================
 
 cdef class ByteMapEx(_ByteMapBase):
@@ -189,7 +189,7 @@ cdef class ByteMapEx(_ByteMapBase):
         cdef size_t c_str_len = 0
         cdef const char* c_str = ByteMapEx.c_key_to_string(key, &c_str_len)
         # c_bytemap_ex_pop copies the value out before the entry is zeroed, so it needs
-        # a destination buffer — the entry's own value[] is gone by the time we return.
+        # a destination buffer - the entry's own value[] is gone by the time we return.
         cdef size_t out_len = 0
         cdef char* out = <char*> PyMem_Malloc(self.header.slot_capacity)
         if out == NULL:
@@ -329,7 +329,7 @@ cdef class ByteMapEx(_ByteMapBase):
 
 
 # ============================================================
-#  ByteMapExDouble — str → double mapping
+#  ByteMapExDouble - str -> double mapping
 # ============================================================
 
 cdef class ByteMapExDouble(_ByteMapBase):
@@ -537,7 +537,7 @@ cdef class ByteMapExDouble(_ByteMapBase):
 
 
 # ============================================================
-#  ByteMap — str/bytes → PyObject* mapping (void* variant)
+#  ByteMap - str/bytes -> PyObject* mapping (void* variant)
 # ============================================================
 
 cdef class ByteMap(_ByteMapBase):
@@ -1011,7 +1011,7 @@ cdef class ByteMap(_ByteMapBase):
 
 
 # ============================================================
-#  _BoundByteMapBase — common base for all bound dict variants
+#  _BoundByteMapBase - common base for all bound dict variants
 # ============================================================
 
 cdef class _BoundByteMapBase(dict):
@@ -1047,10 +1047,15 @@ cdef class _BoundByteMapBase(dict):
         self.owner = True
 
     @staticmethod
-    cdef void c_sync(bytemap_callback_event event,
-                      const char* key, size_t key_len,
-                      const char* value, size_t value_len,
-                      uint64_t seq_id, void* user_data) noexcept:
+    cdef void c_sync(
+            bytemap_callback_event event,
+            const char* key,
+            size_t key_len,
+            const char* value,
+            size_t value_len,
+            uint64_t seq_id,
+            void* user_data
+    ) noexcept:
         cdef PyObject* py_dict = <PyObject*> user_data
         cdef _BoundByteMapBase instance = <_BoundByteMapBase> py_dict
         cdef object py_key, py_value
@@ -1286,7 +1291,7 @@ cdef class _BoundByteMapBase(dict):
 
 
 # ============================================================
-#  BoundByteMapEx — synchronized dict (str → bytes)
+#  BoundByteMapEx - synchronized dict (str -> bytes)
 # ============================================================
 
 cdef class BoundByteMapEx(_BoundByteMapBase):
@@ -1309,7 +1314,7 @@ cdef class BoundByteMapEx(_BoundByteMapBase):
 
 
 # ============================================================
-#  BoundByteMapExDouble — synchronized dict (str → double)
+#  BoundByteMapExDouble - synchronized dict (str -> double)
 # ============================================================
 
 cdef class BoundByteMapExDouble(_BoundByteMapBase):
@@ -1345,7 +1350,7 @@ cdef class BoundByteMapExDouble(_BoundByteMapBase):
 
 
 # ============================================================
-#  BoundByteMap — synchronized dict (str/bytes → PyObject*)
+#  BoundByteMap - synchronized dict (str/bytes -> PyObject*)
 # ============================================================
 
 cdef class BoundByteMap(_BoundByteMapBase):
@@ -1376,7 +1381,7 @@ cdef class BoundByteMap(_BoundByteMapBase):
 
 
 # ============================================================
-#  BoundByteSet — synchronized set backed by bytemap
+#  BoundByteSet - synchronized set backed by bytemap
 # ============================================================
 
 cdef class BoundByteSet(set):

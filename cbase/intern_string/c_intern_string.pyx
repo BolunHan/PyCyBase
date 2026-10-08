@@ -132,7 +132,7 @@ cdef class IstrTestToolkit:
     Parameters
     ----------
     buf_size : size_t
-        Size of the character buffer in bytes (default 2^30 ≈ 1 GiB).
+        Size of the character buffer in bytes (default 2^30 ~ 1 GiB).
     n_seg : size_t
         Number of segments to generate (default 100_000).
     max_seg_len : size_t
@@ -295,7 +295,7 @@ cdef class IstrTestToolkit:
         return elapsed
 
     # ------------------------------------------------------------------
-    #  Intern benchmark — pure C-level, unlocked
+    #  Intern benchmark - pure C-level, unlocked
     # ------------------------------------------------------------------
 
     cpdef double istr_intern_routine(self):
@@ -322,7 +322,7 @@ cdef class IstrTestToolkit:
         return elapsed
 
     # ------------------------------------------------------------------
-    #  Intern benchmark — C-level with mutex (synced)
+    #  Intern benchmark - C-level with mutex (synced)
     # ------------------------------------------------------------------
 
     cpdef double istr_intern_synced_routine(self):
@@ -349,7 +349,7 @@ cdef class IstrTestToolkit:
         return elapsed
 
     # ------------------------------------------------------------------
-    #  Lookup benchmark — pure C-level, unlocked
+    #  Lookup benchmark - pure C-level, unlocked
     # ------------------------------------------------------------------
 
     cpdef double istr_lookup_routine(self):
@@ -371,7 +371,7 @@ cdef class IstrTestToolkit:
         return elapsed
 
     # ------------------------------------------------------------------
-    #  Lookup benchmark — C-level with mutex (synced)
+    #  Lookup benchmark - C-level with mutex (synced)
     # ------------------------------------------------------------------
 
     cpdef double istr_lookup_synced_routine(self):
@@ -393,7 +393,7 @@ cdef class IstrTestToolkit:
         return elapsed
 
     # ------------------------------------------------------------------
-    #  Equality benchmark — InternString Python-level eq
+    #  Equality benchmark - InternString Python-level eq
     # ------------------------------------------------------------------
 
     cpdef double istr_eq_routine(self):
@@ -486,7 +486,7 @@ cdef class IstrTestToolkit:
         return elapsed
 
     # ------------------------------------------------------------------
-    #  Shuffle generator — random picks from limited unique pool
+    #  Shuffle generator - random picks from limited unique pool
     # ------------------------------------------------------------------
 
     cdef inline void c_gen_shuffle(self):
@@ -497,7 +497,7 @@ cdef class IstrTestToolkit:
             self.shuffle_indices[i] = <size_t> randint(0, <int> self.n_unique - 1)
 
     # ------------------------------------------------------------------
-    #  Limited-pool intern — realistic workload (hits + misses mixed)
+    #  Limited-pool intern - realistic workload (hits + misses mixed)
     # ------------------------------------------------------------------
 
     cpdef double istr_limited_pool_routine(self):
@@ -506,7 +506,7 @@ cdef class IstrTestToolkit:
         Each iteration picks n_ops random strings (with replacement) from
         the first n_unique segments and interns them.  Since the pool is
         small relative to n_ops, most operations are hits (already-interned
-        keys) — this mirrors real-world usage where a finite set of strings
+        keys) - this mirrors real-world usage where a finite set of strings
         (e.g. ticker symbols) is interned repeatedly.
         """
         cdef size_t iter_idx, i, idx
@@ -614,11 +614,11 @@ cdef class IstrTestToolkit:
         seq_ptr = 0
         for i in range(self.n_ops):
             if i % miss_interval == 0 and seq_ptr < n_misses:
-                # MISS — use next unique segment
+                # MISS - use next unique segment
                 self.shuffle_indices[i] = seq_ptr
                 seq_ptr += 1
             else:
-                # HIT — random pick from already-seen set
+                # HIT - random pick from already-seen set
                 if seq_ptr > 0:
                     self.shuffle_indices[i] = <size_t> randint(0, <int> seq_ptr - 1)
                 else:
@@ -627,7 +627,7 @@ cdef class IstrTestToolkit:
     cpdef double istr_miss_rate_routine(self, double miss_rate):
         """Benchmark intern with a controlled miss rate.
 
-        miss_rate=0.001 → 1/1K, miss_rate=0.0001 → 1/10K, etc.
+        miss_rate=0.001 -> 1/1K, miss_rate=0.0001 -> 1/10K, etc.
         """
         cdef size_t iter_idx, i, idx
         cdef double elapsed = 0.0
@@ -713,14 +713,14 @@ cdef class IstrTestToolkit:
             'max_seg_len': self.max_seg_len,
             'n_iters': n_iters,
             'total_key_bytes': total_bytes,
-            # Intern string — C-level all-miss (fresh pool each iter)
+            # Intern string - C-level all-miss (fresh pool each iter)
             'istr_hash_ns':         (istr_hash_t      / n_iters / n) * 1e9,
             'istr_intern_ns':       (istr_intern_t    / n_iters / n) * 1e9,
             'istr_intern_synced_ns':(istr_intern_s_t  / n_iters / n) * 1e9,
-            # Intern string — C-level lookup (all hits)
+            # Intern string - C-level lookup (all hits)
             'istr_lookup_ns':       (istr_lookup_t    / n_iters / n) * 1e9,
             'istr_lookup_synced_ns':(istr_lookup_s_t  / n_iters / n) * 1e9,
-            # Intern string — limited pool (realistic hit/miss mix)
+            # Intern string - limited pool (realistic hit/miss mix)
             'istr_limited_ns':         (istr_limited_t    / n_iters / n_ops) * 1e9,
             'istr_limited_synced_ns':  (istr_limited_s_t  / n_iters / n_ops) * 1e9,
             'istr_limited_mutex_ns':   ((istr_limited_s_t - istr_limited_t) / n_iters / n_ops) * 1e9,
