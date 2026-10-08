@@ -66,6 +66,17 @@ def load_private_key(path):
     raise ValueError(f"Could not load key from {path} — unsupported format?")
 
 
+def _unquote(value):
+    """Strip one layer of matching surrounding quotes from an ssh_config value.
+
+    ssh_config quotes values that contain spaces (``User "DOMAIN\\name"``);
+    the quotes are syntax, not part of the value.
+    """
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
+        return value[1:-1]
+    return value
+
+
 def _parse_ssh_config(host_alias):
     """Extract HostName / User / IdentityFile from ~/.ssh/config for *host_alias*."""
     ssh_config_path = Path.home() / ".ssh" / "config"
@@ -85,7 +96,7 @@ def _parse_ssh_config(host_alias):
             if not in_block:
                 continue
             key, _, val = line.partition(" ")
-            key, val = key.strip().lower(), val.strip()
+            key, val = key.strip().lower(), _unquote(val.strip())
             if key == "hostname":
                 hostname = val
             elif key == "user":
