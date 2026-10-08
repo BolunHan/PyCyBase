@@ -9,6 +9,11 @@ from cbase.allocator_protocol.c_dual_interface import (
 
 TK = CCPDualInterfaceTestToolkit
 
+# abort() surfaces differently per platform: POSIX reports the killing
+# signal as -SIGABRT through subprocess, while the Windows UCRT terminates
+# through __fastfail, surfacing the raw NTSTATUS 0xC0000409.
+_ABORT_RETURNCODE = 0xC0000409 if sys.platform == "win32" else -6
+
 
 class TestCCPAttachmentProtocol(unittest.TestCase):
     """Contract: the CCP attachment protocol binds a wrapper through an
@@ -38,8 +43,8 @@ class TestCCPAttachmentProtocol(unittest.TestCase):
           the two it is (BufferError when detached).
 
     Oracle: the child process must exit 0 with no "[AP_ALLOC_VIGILANT] ERROR"
-    and no "Exception ignored" on stderr (failures segfault (139) or abort
-    (134)).
+    and no "Exception ignored" on stderr (a failure crashes the child with
+    the platform's abort or segfault code).
     """
 
     @classmethod
@@ -361,12 +366,12 @@ class TestCCPAttachmentProtocol(unittest.TestCase):
 
     def _assert_abort_run(self, code: str) -> None:
         proc = self._run_in_subprocess(code)
-        self.assertEqual(proc.returncode, -6, f"stderr:\n{proc.stderr}")
+        self.assertEqual(proc.returncode, _ABORT_RETURNCODE, f"stderr:\n{proc.stderr}")
         self.assertIn("[CCP] ERROR", proc.stderr)
         self.assertIn("double", proc.stderr)
 
     def test_18_double_attach_on_owned_aborts(self) -> None:
-        """A second attach on an already-attached wrapper aborts (SIGABRT)
+        """A second attach on an already-attached wrapper aborts
         with a [CCP] ERROR message on stderr — the ctx must be fresh (the
         zeroed allocation guarantees ap_header == NULL on first attach)."""
         self._assert_abort_run(
