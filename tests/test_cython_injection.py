@@ -66,18 +66,18 @@ class TestResolveSitePackages(_FakeEnv):
 
     def test_00_venv_root(self) -> None:
         """A venv root resolves through lib/python*/site-packages."""
-        self.assertEqual(resolve_site_packages(self.venv), self.site_packages)
+        self.assertEqual(resolve_site_packages(self.venv), self.site_packages.resolve())
 
     def test_01_site_packages_direct(self) -> None:
         """An explicit site-packages path is returned unchanged."""
-        self.assertEqual(resolve_site_packages(self.site_packages), self.site_packages)
+        self.assertEqual(resolve_site_packages(self.site_packages), self.site_packages.resolve())
 
     def test_02_windows_layout(self) -> None:
         """The Windows Lib/site-packages layout is recognized."""
         venv = self.root / 'win-venv'
         site_packages = venv / 'Lib' / 'site-packages'
         (site_packages / 'Cython' / 'Includes').mkdir(parents=True)
-        self.assertEqual(resolve_site_packages(venv), site_packages)
+        self.assertEqual(resolve_site_packages(venv), site_packages.resolve())
 
     def test_03_interpreter_beats_virtual_env(self) -> None:
         """The running interpreter wins over a stale VIRTUAL_ENV."""
@@ -88,7 +88,7 @@ class TestResolveSitePackages(_FakeEnv):
             mock.patch('cbase.cython_injection.sysconfig.get_paths', return_value=paths),
             mock.patch.dict(os.environ, {'VIRTUAL_ENV': str(self.root / 'other-venv'), 'CONDA_PREFIX': ''}),
         ):
-            self.assertEqual(resolve_site_packages(), self.site_packages)
+            self.assertEqual(resolve_site_packages(), self.site_packages.resolve())
 
     def test_04_virtual_env_fallback(self) -> None:
         """VIRTUAL_ENV is used when the running interpreter has no candidates."""
@@ -98,7 +98,7 @@ class TestResolveSitePackages(_FakeEnv):
             mock.patch('cbase.cython_injection.site.ENABLE_USER_SITE', False),
             mock.patch.dict(os.environ, {'VIRTUAL_ENV': str(self.venv), 'CONDA_PREFIX': ''}),
         ):
-            self.assertEqual(resolve_site_packages(), self.site_packages)
+            self.assertEqual(resolve_site_packages(), self.site_packages.resolve())
 
     def test_05_missing_environment(self) -> None:
         """A nonexistent environment yields None."""
@@ -106,7 +106,7 @@ class TestResolveSitePackages(_FakeEnv):
 
     def test_06_cython_includes_lookup(self) -> None:
         """Cython/Includes is found only when it exists."""
-        self.assertEqual(resolve_cython_includes(self.site_packages), self.includes)
+        self.assertEqual(resolve_cython_includes(self.site_packages), self.includes.resolve())
         bare = self.root / 'bare'
         bare.mkdir()
         self.assertIsNone(resolve_cython_includes(bare))
@@ -292,8 +292,11 @@ class TestStatusAndUninject(_FakeEnv):
 
     def test_05_path_helper(self) -> None:
         """The path helper names the entry without creating it."""
-        self.assertEqual(cython_injection_path('cbase', env=self.venv), self.link)
-        self.assertEqual(cython_injection_path('cbase', env=self.venv, name='alias'), self.includes / 'alias')
+        self.assertEqual(cython_injection_path('cbase', env=self.venv), self.link.resolve())
+        self.assertEqual(
+            cython_injection_path('cbase', env=self.venv, name='alias'),
+            (self.includes / 'alias').resolve(),
+        )
         self.assertIsNone(cython_injection_path('cbase', env=self.root / 'missing'))
 
 
