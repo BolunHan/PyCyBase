@@ -240,6 +240,21 @@ class TestInjectCythonIncludes(_FakeEnv):
             SKIPPED_NO_ENVIRONMENT,
         )
 
+    def test_17_explicit_includes_dir(self) -> None:
+        """includes_dir= targets a Cython Includes directory directly."""
+        includes = self.root / 'custom' / 'Cython' / 'Includes'
+        includes.mkdir(parents=True)
+        status = inject_cython_includes(
+            'cbase', source=self.package_source, editable=True, includes_dir=includes
+        )
+        self.assertEqual(status, INJECTED)
+        self.assertEqual(Path(os.path.realpath(includes / 'cbase')), self.package_source.resolve())
+
+    def test_18_includes_dir_is_mutually_exclusive(self) -> None:
+        """env, site_packages and includes_dir select one target only."""
+        with self.assertRaises(ValueError):
+            inject_cython_includes('cbase', env=self.venv, includes_dir=self.includes)
+
 
 class TestStatusAndUninject(_FakeEnv):
     """Contract: status is observable and uninject removes only symlinks."""

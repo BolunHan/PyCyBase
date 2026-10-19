@@ -42,6 +42,7 @@ import sysconfig
 from pathlib import Path
 
 LOGGER = logging.getLogger(__name__)
+LOGGER.addHandler(logging.NullHandler())
 
 INJECTED = "injected"
 ALREADY_INJECTED = "already-injected"
@@ -169,10 +170,16 @@ def resolve_cython_includes(site_packages: str | os.PathLike[str]) -> Path | Non
 def _resolve_includes(
         env: str | os.PathLike[str] | None,
         site_packages: str | os.PathLike[str] | None,
+        includes_dir: str | os.PathLike[str] | None = None,
 ) -> tuple[Path | None, Path | None, str | None]:
     """Resolve the target site-packages and Cython Includes directories."""
-    if env is not None and site_packages is not None:
-        raise ValueError("pass either env or site_packages, not both")
+    if sum(value is not None for value in (env, site_packages, includes_dir)) > 1:
+        raise ValueError("pass only one of env, site_packages or includes_dir")
+    if includes_dir is not None:
+        includes = Path(includes_dir)
+        if not includes.is_dir():
+            return None, None, SKIPPED_NO_CYTHON
+        return includes.parent.parent, includes.resolve(), None
     resolved = resolve_site_packages(site_packages if site_packages is not None else env)
     if resolved is None:
         return None, None, SKIPPED_NO_ENVIRONMENT
@@ -205,6 +212,11 @@ def _resolve_source(package: str, source: str | os.PathLike[str] | None) -> Path
 def _link_name(package: str, name: str | None) -> str:
     """Return the name of the entry under ``Cython/Includes``."""
     return name or package.rsplit(".", 1)[-1]
+
+
+def _is_windows() -> bool:
+    """Return whether the running platform is Windows."""
+    return os.name == "nt"
 
 
 def _report(status: str, message: str, strict: bool = False) -> str:
@@ -249,12 +261,12 @@ def _create_link(link_path: Path, target: Path, *, force: bool, strict: bool) ->
     try:
         os.symlink(relative, link_path, target_is_directory=True)
     except OSError as exc:
-        if os.name != "nt":
+        if not _is_windows():
             return _report(FAILED, f"could not create {link_path} -> {relative}: {exc}", strict)
         # Windows without symlink privilege: a junction needs no elevation.
         try:
             subprocess.run(
-                ["cmd", "/c", "mklink", "/J", str(link_path), target_abs],
+                ["cmd", "/c", "mklink", "/J", str(link_path), str(target_abs)],
                 check=True,
                 capture_output=True,
             )
@@ -271,6 +283,7 @@ def inject_cython_includes(
         source: str | os.PathLike[str] | None = None,
         env: str | os.PathLike[str] | None = None,
         site_packages: str | os.PathLike[str] | None = None,
+        includes_dir: str | os.PathLike[str] | None = None,
         editable: bool | None = None,
         name: str | None = None,
         force: bool = False,
@@ -290,6 +303,9 @@ def inject_cython_includes(
             exclusive with *env*.  When neither is given, the running
             interpreter is inspected first, then ``VIRTUAL_ENV`` /
             ``CONDA_PREFIX``.
+        includes_dir: Explicit ``Cython/Includes`` directory.  Mutually
+            exclusive with *env* and *site_packages*; useful for tests and
+            layouts that do not follow the standard environment shape.
         editable: ``True`` links to *source* (in-place install), ``False``
             links to the installed ``site-packages/<package>`` copy.  ``None``
             checks ``setup.py develop`` / ``editable`` arguments and otherwise
@@ -306,7 +322,7 @@ def inject_cython_includes(
         ``skipped-no-environment``, ``skipped-no-cython`` or
         ``skipped-no-package``.
     """
-    resolved, includes, skip = _resolve_includes(env, site_packages)
+    resolved, includes, skip = _resolve_includes(env, site_packages, includes_dir)
     if resolved is None:
         return _report(
             SKIPPED_NO_ENVIRONMENT,
@@ -353,6 +369,7 @@ def uninject_cython_includes(
         *,
         env: str | os.PathLike[str] | None = None,
         site_packages: str | os.PathLike[str] | None = None,
+        includes_dir: str | os.PathLike[str] | None = None,
         name: str | None = None,
         strict: bool = False,
 ) -> str:
@@ -365,7 +382,7 @@ def uninject_cython_includes(
         One of ``uninjected``, ``not-injected``, ``conflict``, ``failed`` or
         a ``skipped-*`` status.
     """
-    _, includes, skip = _resolve_includes(env, site_packages)
+    _, includes, skip = _resolve_includes(env, site_packages, includes_dir)
     if skip is not None:
         return _report(skip, f"cannot uninject {package!r}: {skip}", strict)
 
@@ -386,6 +403,7 @@ def cython_injection_status(
         *,
         env: str | os.PathLike[str] | None = None,
         site_packages: str | os.PathLike[str] | None = None,
+        includes_dir: str | os.PathLike[str] | None = None,
         name: str | None = None,
 ) -> str:
     """Report the state of the ``Cython/Includes`` entry for *package*.
@@ -396,7 +414,7 @@ def cython_injection_status(
         ``conflict`` when a real file or directory occupies the path, or a
         ``skipped-*`` status when the environment cannot be inspected.
     """
-    _, includes, skip = _resolve_includes(env, site_packages)
+    _, includes, skip = _resolve_includes(env, site_packages, includes_dir)
     if skip is not None:
         return skip
 
@@ -413,10 +431,11 @@ def cython_injection_path(
         *,
         env: str | os.PathLike[str] | None = None,
         site_packages: str | os.PathLike[str] | None = None,
+        includes_dir: str | os.PathLike[str] | None = None,
         name: str | None = None,
 ) -> Path | None:
     """Return the path of the ``Cython/Includes`` entry, or ``None``."""
-    _, includes, _ = _resolve_includes(env, site_packages)
+    _, includes, _ = _resolve_includes(env, site_packages, includes_dir)
     if includes is None:
         return None
     return includes / _link_name(package, name)

@@ -37,11 +37,13 @@ Environment detection
 
 The target site-packages directory is selected in this order:
 
-1. an explicit ``site_packages=`` directory;
-2. an explicit ``env=`` environment root (POSIX ``lib/python*/site-packages``
+1. an explicit ``includes_dir=`` Cython Includes directory (tests and unusual
+   layouts);
+2. an explicit ``site_packages=`` directory;
+3. an explicit ``env=`` environment root (POSIX ``lib/python*/site-packages``
    or Windows ``Lib/site-packages``);
-3. the running interpreter's ``sysconfig`` paths;
-4. ``VIRTUAL_ENV`` and ``CONDA_PREFIX``.
+4. the running interpreter's ``sysconfig`` paths;
+5. ``VIRTUAL_ENV`` and ``CONDA_PREFIX``.
 
 The running interpreter is checked before the environment variables because
 pip runs ``setup.py`` with the interpreter it installs into.  A stale
