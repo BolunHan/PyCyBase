@@ -22,6 +22,7 @@ heap, shared-memory, and raw-``malloc`` backends.
    intern_string
    backports
    env_config
+   cython_injection
    c_api
    api_reference
 

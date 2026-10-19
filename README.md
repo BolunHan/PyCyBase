@@ -45,7 +45,7 @@ assert bm[b"ticker"] == b"AAPL"
 
 ## Build & Install
 
-PyCyBase is a Cython extension package — it **cannot** be used with `pip install -e .` (editable mode breaks Cython `.pxd` resolution for downstream projects).
+PyCyBase is a Cython extension package. Editable installs (`pip install -e .`) are supported: the build links the source tree into the environment's `Cython/Includes`, so downstream `cimport cbase` still resolves while you edit.
 
 ### POSIX (Linux / macOS)
 
@@ -137,6 +137,33 @@ ext = Extension(
 )
 setup(ext_modules=cythonize([ext]))
 ```
+
+### Cython Include Injection
+
+`pip install -U . --no-build-isolation` and `pip install -e .` call
+`cbase.cython_injection.inject_cython_includes` from `setup.py`. It finds the
+target environment, checks that Cython is installed there, and links:
+
+```text
+<site-packages>/Cython/Includes/cbase -> ../../cbase
+```
+
+The same function is reusable from downstream packages such as PyAlgoEngine:
+
+```python
+from cbase.cython_injection import inject_cython_includes
+
+# inside a build_ext command, after super().run()
+inject_cython_includes(
+    "algo_engine",
+    source="path/to/PyAlgoEngine/algo_engine",
+    editable=self.inplace,
+)
+```
+
+Calls return a status (`injected`, `already-injected`, `conflict`,
+`skipped-no-cython`, ...) instead of raising. `uninject_cython_includes`
+removes only symlinks. See `docs/cython_injection.rst` for the full API.
 
 ## Modules
 

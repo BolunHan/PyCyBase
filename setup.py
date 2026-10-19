@@ -1,3 +1,4 @@
+import importlib.util
 import os
 import platform
 import re
@@ -25,6 +26,22 @@ REPO_ROOT = os.path.abspath(os.path.dirname(__file__))
 N_CORES = os.cpu_count() or 1
 N_THREADS = 0 if (platform.system() == "Windows" or NO_MARCH_NATIVE) else max(1, N_CORES - 2)
 __VERSION__ = match.group(1) if (match := re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']', (Path(REPO_ROOT) / PACKAGE_NAME / '__init__.py').read_text(), re.MULTILINE)) else "unknown"
+
+
+def _load_cython_injection():
+    """Load ``cbase/cython_injection.py`` by file path.
+
+    Importing ``cbase`` here would execute the package ``__init__`` and fail
+    in a clean source tree where the compiled extensions do not exist yet.
+    """
+    module_path = Path(REPO_ROOT) / PACKAGE_NAME / "cython_injection.py"
+    spec = importlib.util.spec_from_file_location("_cbase_cython_injection", module_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"cannot load {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
 
 ext_modules = []
 c_extensions = []
@@ -79,6 +96,9 @@ class BuildExtWithConfig(build_ext):
         # Inject the generated includes/ mirror into build_lib so it gets packaged
         self.inject_sources()
 
+        # Make the package's .pxd files visible to Cython in the target env
+        self.inject_cython_includes()
+
     @classmethod
     def collect_sources(cls) -> None:
         project_root = Path(__file__).resolve().parent
@@ -117,6 +137,31 @@ class BuildExtWithConfig(build_ext):
 
         shutil.copytree(mirror_root, dest_root)
         print(f"[build_py] <{DISPLAY_NAME}> injected includes mirror -> {dest_root.relative_to(Path(self.build_lib))}")
+
+    def inject_cython_includes(self) -> None:
+        """Link the package into the target environment's Cython/Includes.
+
+        Editable builds (``build_ext.inplace``) point at the source tree;
+        wheel builds point at the copy being installed into site-packages.
+        Failure never aborts an install: the package remains usable, only
+        cross-package ``cimport`` would lack its declarations.
+        """
+        try:
+            module = _load_cython_injection()
+            status = module.inject_cython_includes(
+                PACKAGE_NAME,
+                source=Path(REPO_ROOT) / PACKAGE_NAME,
+                editable=bool(getattr(self, "inplace", False)),
+            )
+            link = module.cython_injection_path(PACKAGE_NAME)
+        except Exception as exc:
+            print(f"[build_py] <{DISPLAY_NAME}> Warning: Cython include injection failed: {exc}")
+            return
+
+        if status in (module.INJECTED, module.ALREADY_INJECTED) and link is not None:
+            print(f"[build_py] <{DISPLAY_NAME}> Cython/Includes/{PACKAGE_NAME} -> {os.readlink(link)}")
+        else:
+            print(f"[build_py] <{DISPLAY_NAME}> Cython include injection: {status}")
 
     @classmethod
     def remove_pxd(cls) -> None:

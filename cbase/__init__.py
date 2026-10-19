@@ -19,8 +19,15 @@ if _RTLD_GLOBAL:
     except Exception:
         pass  # graceful fallback: symbols are provided by libc on modern systems
 
-from .config_view import CONFIG_VIEW
-from .backports.telemetrics import get_logger
+from .config_view import CONFIG_VIEW  # noqa: E402
+from .backports.telemetrics import get_logger  # noqa: E402
+from .cython_injection import (  # noqa: E402
+    CythonInjectionError,
+    cython_injection_path,
+    cython_injection_status,
+    inject_cython_includes,
+    uninject_cython_includes,
+)
 
 LOGGER = get_logger(name='PyCyBase')
 
@@ -62,4 +69,9 @@ def get_include() -> list[str]:
 __all__ = [
     'get_include',
     'CONFIG_VIEW',
+    'CythonInjectionError',
+    'cython_injection_path',
+    'cython_injection_status',
+    'inject_cython_includes',
+    'uninject_cython_includes',
 ]
