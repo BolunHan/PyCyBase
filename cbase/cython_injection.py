@@ -167,8 +167,8 @@ def resolve_cython_includes(site_packages: str | os.PathLike[str]) -> Path | Non
 
 
 def _resolve_includes(
-    env: str | os.PathLike[str] | None,
-    site_packages: str | os.PathLike[str] | None,
+        env: str | os.PathLike[str] | None,
+        site_packages: str | os.PathLike[str] | None,
 ) -> tuple[Path | None, Path | None, str | None]:
     """Resolve the target site-packages and Cython Includes directories."""
     if env is not None and site_packages is not None:
@@ -266,15 +266,15 @@ def _create_link(link_path: Path, target: Path, *, force: bool, strict: bool) ->
 
 
 def inject_cython_includes(
-    package: str = "cbase",
-    *,
-    source: str | os.PathLike[str] | None = None,
-    env: str | os.PathLike[str] | None = None,
-    site_packages: str | os.PathLike[str] | None = None,
-    editable: bool | None = None,
-    name: str | None = None,
-    force: bool = False,
-    strict: bool = False,
+        package: str = "cbase",
+        *,
+        source: str | os.PathLike[str] | None = None,
+        env: str | os.PathLike[str] | None = None,
+        site_packages: str | os.PathLike[str] | None = None,
+        editable: bool | None = None,
+        name: str | None = None,
+        force: bool = False,
+        strict: bool = False,
 ) -> str:
     """Create the ``Cython/Includes`` symlink for *package*.
 
@@ -349,12 +349,12 @@ def inject_cython_includes(
 
 
 def uninject_cython_includes(
-    package: str = "cbase",
-    *,
-    env: str | os.PathLike[str] | None = None,
-    site_packages: str | os.PathLike[str] | None = None,
-    name: str | None = None,
-    strict: bool = False,
+        package: str = "cbase",
+        *,
+        env: str | os.PathLike[str] | None = None,
+        site_packages: str | os.PathLike[str] | None = None,
+        name: str | None = None,
+        strict: bool = False,
 ) -> str:
     """Remove the ``Cython/Includes`` symlink for *package*.
 
@@ -382,11 +382,11 @@ def uninject_cython_includes(
 
 
 def cython_injection_status(
-    package: str = "cbase",
-    *,
-    env: str | os.PathLike[str] | None = None,
-    site_packages: str | os.PathLike[str] | None = None,
-    name: str | None = None,
+        package: str = "cbase",
+        *,
+        env: str | os.PathLike[str] | None = None,
+        site_packages: str | os.PathLike[str] | None = None,
+        name: str | None = None,
 ) -> str:
     """Report the state of the ``Cython/Includes`` entry for *package*.
 
@@ -409,11 +409,11 @@ def cython_injection_status(
 
 
 def cython_injection_path(
-    package: str = "cbase",
-    *,
-    env: str | os.PathLike[str] | None = None,
-    site_packages: str | os.PathLike[str] | None = None,
-    name: str | None = None,
+        package: str = "cbase",
+        *,
+        env: str | os.PathLike[str] | None = None,
+        site_packages: str | os.PathLike[str] | None = None,
+        name: str | None = None,
 ) -> Path | None:
     """Return the path of the ``Cython/Includes`` entry, or ``None``."""
     _, includes, _ = _resolve_includes(env, site_packages)
