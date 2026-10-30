@@ -39,6 +39,7 @@ import site
 import subprocess
 import sys
 import sysconfig
+import zipfile
 from pathlib import Path
 
 LOGGER = logging.getLogger(__name__)
@@ -70,6 +71,7 @@ __all__ = [
     "cython_injection_path",
     "cython_injection_status",
     "inject_cython_includes",
+    "record_cython_include",
     "resolve_cython_includes",
     "resolve_site_packages",
     "uninject_cython_includes",
@@ -424,6 +426,56 @@ def cython_injection_status(
     if link_path.exists():
         return CONFLICT
     return NOT_INJECTED
+
+
+def record_cython_include(
+        wheel_path: str | os.PathLike[str],
+        package: str = "cbase",
+        *,
+        name: str | None = None,
+) -> bool:
+    """Append the ``Cython/Includes`` entry to a wheel's ``RECORD``.
+
+    ``pip uninstall`` removes the paths listed in the installed distribution's
+    ``RECORD``.  The injected link lives outside the package tree, so a wheel
+    built for this package must list it there to let pip remove it during
+    uninstall.
+
+    Args:
+        wheel_path: Path to a built ``.whl`` file.
+        package: Top-level import name of the package.
+        name: Entry name under ``Cython/Includes``.  Defaults to the last
+            component of *package*.
+
+    Returns:
+        ``True`` when the entry was added, ``False`` when it was already
+        present, the wheel has no ``RECORD``, or the wheel cannot be read.
+    """
+    wheel_path = Path(wheel_path)
+    entry = f"Cython/Includes/{_link_name(package, name)}"
+    temp_path = wheel_path.with_name(wheel_path.name + ".tmp")
+    added = False
+    try:
+        with zipfile.ZipFile(wheel_path) as source, zipfile.ZipFile(temp_path, "w") as target:
+            for item in source.infolist():
+                data = source.read(item.filename)
+                if item.filename.endswith(".dist-info/RECORD"):
+                    text = data.decode("utf-8")
+                    names = {line.split(",", 1)[0] for line in text.splitlines()}
+                    if entry not in names:
+                        text = text.rstrip("\n") + "\n" + entry + ",,\n"
+                        added = True
+                    data = text.encode("utf-8")
+                target.writestr(item, data)
+        if added:
+            os.replace(temp_path, wheel_path)
+        else:
+            temp_path.unlink(missing_ok=True)
+    except (OSError, zipfile.BadZipFile) as exc:
+        temp_path.unlink(missing_ok=True)
+        LOGGER.warning("could not record %s in %s: %s", entry, wheel_path, exc)
+        return False
+    return added
 
 
 def cython_injection_path(

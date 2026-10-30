@@ -162,8 +162,10 @@ inject_cython_includes(
 ```
 
 Calls return a status (`injected`, `already-injected`, `conflict`,
-`skipped-no-cython`, ...) instead of raising. `uninject_cython_includes`
-removes only symlinks. See `docs/cython_injection.rst` for the full API.
+`skipped-no-cython`, ...) instead of raising. The wheel records the link in
+its `RECORD`, so `pip uninstall` removes it automatically; for installs that
+predate this behavior, `uninject_cython_includes` removes it manually. See
+`docs/cython_injection.rst` for the full API.
 
 ## Modules
 

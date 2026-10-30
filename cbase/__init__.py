@@ -26,6 +26,7 @@ from .cython_injection import (  # noqa: E402
     cython_injection_path,
     cython_injection_status,
     inject_cython_includes,
+    record_cython_include,
     uninject_cython_includes,
 )
 
@@ -73,5 +74,6 @@ __all__ = [
     'cython_injection_path',
     'cython_injection_status',
     'inject_cython_includes',
+    'record_cython_include',
     'uninject_cython_includes',
 ]

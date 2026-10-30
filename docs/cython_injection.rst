@@ -26,6 +26,8 @@ Public API
 
 .. autofunction:: cbase.cython_injection.cython_injection_path
 
+.. autofunction:: cbase.cython_injection.record_cython_include
+
 .. autofunction:: cbase.cython_injection.resolve_site_packages
 
 .. autofunction:: cbase.cython_injection.resolve_cython_includes
@@ -97,6 +99,20 @@ Idempotency and removal
 Calling ``inject_cython_includes`` twice is safe: the second call reports
 ``already-injected``.  ``uninject_cython_includes`` removes only symlinks;
 a real directory at the link path reports ``conflict`` and is preserved.
+
+Uninstall cleanup
+-----------------
+
+``pip`` removes a distribution's files from the paths listed in its
+``RECORD``.  The injected link lives outside the package tree, so the build
+records ``Cython/Includes/<package>`` in the wheel's ``RECORD`` through
+``record_cython_include``.  Both the normal ``bdist_wheel`` path and the
+PEP 660 ``editable_wheel`` path do this, so ``pip uninstall`` removes the
+link together with the package.
+
+``pip`` only removes the link while its target exists.  If an install predates
+this behavior, or the target was deleted first, call
+``uninject_cython_includes(package)`` manually.
 
 Windows
 -------
