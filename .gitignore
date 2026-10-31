@@ -23,6 +23,7 @@ cbase/includes/
 # IDE
 .idea/
 .vscode/
+.orbit/
 
 # Test Artifacts
 test/*/artifacts/
