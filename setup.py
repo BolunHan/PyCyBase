@@ -25,7 +25,7 @@ except ImportError:  # setuptools < 64 has no PEP 660 editable command
 # Setup Configuration
 # ==============================
 
-BUILD_SCRIPT_VERSION = "2.1.0"
+BUILD_SCRIPT_VERSION = "2.1.1"
 PACKAGE_NAME = "cbase"
 DISPLAY_NAME = "PyCyBase"
 
@@ -260,7 +260,6 @@ if _editable_wheel is not None:
             if not module.record_cython_include(wheel_path, PACKAGE_NAME):
                 print(f"[build_py] <{DISPLAY_NAME}> Warning: Cython include link not recorded in {wheel_path.name}")
             return wheel_path
-
 
 # =============================
 # Define Cython Extensions
