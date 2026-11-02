@@ -12,10 +12,12 @@ from cbase.bytemap.c_bytemap import (
     BoundByteMap,
     BoundByteMapEx,
     BoundByteMapExDouble,
+    BoundByteMapExSized,
     BoundByteSet,
     ByteMap,
     ByteMapEx,
     ByteMapExDouble,
+    ByteMapExSized,
 )
 
 
@@ -947,6 +949,365 @@ class TestBoundByteMapClassHierarchy(unittest.TestCase):
         bbm = BoundByteMap()
         bbm.rebind(src_map)  # rebind uses isinstance check against base classes
         self.assertEqual(bbm['a'], 1)
+
+
+class TestByteMapExSized(unittest.TestCase):
+    """Contract:
+    - Mapping behaves as str -> ssize_t.
+    - Integer APIs return Python ints consistently, including negative and wide values.
+    - Missing-key behavior mirrors dict-style defaults and KeyError semantics.
+    """
+
+    def setUp(self):
+        self.mapping = ByteMapExSized()
+
+    @staticmethod
+    def _build_payload(size):
+        return {f"k_{i:05d}": (i * 125) - 17_000 for i in range(size)}
+
+    def test_00_basic_set_get_and_contains(self):
+        self.mapping["px"] = -12
+        self.assertEqual(self.mapping["px"], -12)
+        self.assertEqual(len(self.mapping), 1)
+        self.assertIn("px", self.mapping)
+        self.assertTrue(self.mapping.contains("px"))
+
+    def test_01_get_default_none_and_custom_default(self):
+        self.assertIsNone(self.mapping.get("missing"))
+        self.assertEqual(self.mapping.get("missing", -7), -7)
+
+    def test_02_pop_returns_int_and_removes_key(self):
+        self.mapping["k1"] = 314
+
+        popped = self.mapping.pop("k1")
+
+        self.assertEqual(popped, 314)
+        self.assertNotIn("k1", self.mapping)
+
+    def test_03_pop_missing_contract(self):
+        self.assertEqual(self.mapping.pop("missing", -9), -9)
+        with self.assertRaises(KeyError):
+            self.mapping.pop("missing")
+
+    def test_04_values_items_as_dict_are_ints(self):
+        payload = {"x": 1, "y": -2, "z": 3}
+        for key, value in payload.items():
+            self.mapping[key] = value
+
+        self.assertEqual(set(self.mapping.keys()), set(payload.keys()))
+        self.assertEqual(self.mapping.as_dict, payload)
+        self.assertEqual(dict(self.mapping.items()), payload)
+        self.assertEqual(set(self.mapping.values()), set(payload.values()))
+        for value in self.mapping.values():
+            self.assertIsInstance(value, int)
+
+    def test_05_bulk_set_get_contains_and_overwrite(self):
+        payload = self._build_payload(256)
+        for key, value in payload.items():
+            self.mapping[key] = value
+
+        self.assertEqual(len(self.mapping), len(payload))
+        for key, value in payload.items():
+            self.assertEqual(self.mapping[key], value)
+
+        updated = {key: value + 11 for index, (key, value) in enumerate(payload.items()) if index % 5 == 0}
+        for key, value in updated.items():
+            self.mapping[key] = value
+            payload[key] = value
+
+        self.assertEqual(len(self.mapping), len(payload))
+        for key, value in payload.items():
+            self.assertEqual(self.mapping[key], value)
+
+    def test_06_bulk_pop_preserves_remaining_entries(self):
+        payload = self._build_payload(192)
+        for key, value in payload.items():
+            self.mapping[key] = value
+
+        pop_keys = [key for index, key in enumerate(payload) if index % 3 == 0]
+        kept = dict(payload)
+        for key in pop_keys:
+            self.assertEqual(self.mapping.pop(key), payload[key])
+            del kept[key]
+
+        self.assertEqual(len(self.mapping), len(kept))
+        for key, value in kept.items():
+            self.assertEqual(self.mapping[key], value)
+        for key in pop_keys:
+            self.assertEqual(self.mapping.pop(key, -999), -999)
+            with self.assertRaises(KeyError):
+                self.mapping.pop(key)
+
+    def test_07_rehash_and_auto_extend(self):
+        mapping = ByteMapExSized(init_capacity=2)
+
+        for i in range(1_000):
+            mapping[f"key_{i:05d}"] = i - 500
+
+        for i in range(1_000):
+            self.assertEqual(mapping[f"key_{i:05d}"], i - 500)
+
+    def test_08_copy(self):
+        self.mapping["a"] = 1
+        self.mapping["b"] = -2
+
+        import copy
+        clone = copy.copy(self.mapping)
+        self.assertEqual(clone["a"], 1)
+        self.assertEqual(clone["b"], -2)
+
+        self.mapping["a"] = 10
+        self.assertEqual(clone["a"], 1)
+
+    def test_09_setdefault_hit_keeps_existing_value(self):
+        self.mapping["px"] = 12
+
+        result = self.mapping.setdefault("px", 99)
+
+        self.assertEqual(result, 12)
+        self.assertEqual(self.mapping["px"], 12)
+        self.assertEqual(len(self.mapping), 1)
+
+    def test_10_setdefault_miss_inserts_default(self):
+        result = self.mapping.setdefault("qy", -7)
+
+        self.assertEqual(result, -7)
+        self.assertEqual(self.mapping["qy"], -7)
+        self.assertIn("qy", self.mapping)
+        self.assertEqual(len(self.mapping), 1)
+
+    def test_11_setdefault_without_default_contract(self):
+        self.mapping["rz"] = -3
+
+        self.assertEqual(self.mapping.setdefault("rz"), -3)
+
+        with self.assertRaises(KeyError):
+            self.mapping.setdefault("nope")
+        self.assertNotIn("nope", self.mapping)
+        self.assertEqual(len(self.mapping), 1)
+
+    def test_12_setdefault_bulk_growth_preserves_values(self):
+        mapping = ByteMapExSized(init_capacity=2)
+        expected = {}
+
+        for i in range(500):
+            key = f"key_{i:05d}"
+            value = i - 250
+            self.assertEqual(mapping.setdefault(key, value), value)
+            expected[key] = value
+
+        self.assertEqual(len(mapping), len(expected))
+        for key, value in expected.items():
+            self.assertEqual(mapping.setdefault(key, -1), value)
+
+    def test_13_wide_and_negative_values_round_trip(self):
+        wide = 1 << 40
+        payload = {
+            "zero": 0,
+            "minus_one": -1,
+            "wide": wide,
+            "minus_wide": -wide,
+            "min": -(1 << 62),
+            "max": 1 << 62,
+        }
+        for key, value in payload.items():
+            self.mapping[key] = value
+
+        self.assertEqual(self.mapping.as_dict, payload)
+        for key, value in payload.items():
+            self.assertEqual(self.mapping[key], value)
+
+    def test_14_invalid_and_out_of_range_values(self):
+        with self.assertRaises(TypeError):
+            self.mapping["bad_float"] = 1.5
+        with self.assertRaises(TypeError):
+            self.mapping["bad_str"] = "12"
+        with self.assertRaises(OverflowError):
+            self.mapping["too_wide"] = 1 << 100
+        self.assertEqual(len(self.mapping), 0)
+
+
+class TestBoundByteMapExSized(unittest.TestCase):
+    """Contract:
+    - BoundByteMapExSized keeps Python dict cache and C storage consistent for integer values.
+    - Forked/rebound instances reflect callback-driven mutations.
+    - Coercion and failure modes are explicit.
+    """
+
+    def setUp(self):
+        self.mapping = BoundByteMapExSized()
+
+    @staticmethod
+    def _build_payload(size):
+        return {f"sk_{i:05d}": (i * 137) - 13_700 for i in range(size)}
+
+    def assert_sized_mapping_matches(self, mapping, expected):
+        self.assertEqual(set(mapping.keys()), set(expected.keys()))
+        self.assertEqual(len(mapping), len(expected))
+        for key, expected_value in expected.items():
+            self.assertIn(key, mapping)
+            self.assertIsInstance(mapping[key], int)
+            self.assertEqual(mapping[key], expected_value)
+
+    def test_00_bulk_set_get_contains_and_overwrite(self):
+        payload = self._build_payload(256)
+        for key, value in payload.items():
+            self.mapping[key] = value
+
+        self.assert_sized_mapping_matches(self.mapping, payload)
+
+        updated = {key: value + 11 for index, (key, value) in enumerate(payload.items()) if index % 5 == 0}
+        for key, value in updated.items():
+            self.mapping[key] = value
+            payload[key] = value
+
+        self.assert_sized_mapping_matches(self.mapping, payload)
+
+    def test_01_fork(self):
+        src = BoundByteMapExSized()
+        payload = self._build_payload(128)
+        src.update(payload)
+        forked = src.fork()
+
+        self.assert_sized_mapping_matches(forked, payload)
+
+    def test_02_pop_default_and_remaining_entries_contract(self):
+        payload = self._build_payload(128)
+        self.mapping.update(payload)
+
+        pop_keys = [key for index, key in enumerate(payload) if index % 4 == 0]
+        kept = dict(payload)
+        for key in pop_keys:
+            self.assertEqual(self.mapping.pop(key), payload[key])
+            del kept[key]
+
+        self.assert_sized_mapping_matches(self.mapping, kept)
+        self.assertEqual(self.mapping.pop("missing", -7), -7)
+        with self.assertRaises(KeyError):
+            self.mapping.pop("missing")
+
+    def test_03_update_clear_and_repr(self):
+        payload = {"a": 1, "b": -2, "c": 0, "d": 1 << 40}
+        self.mapping.update(payload)
+
+        self.assert_sized_mapping_matches(self.mapping, payload)
+
+        rep = repr(self.mapping)
+        self.assertIn("BoundByteMapExSized", rep)
+        self.assertIn("a", rep)
+
+        self.mapping.clear()
+        self.assertEqual(len(self.mapping), 0)
+        self.assertEqual(dict(self.mapping), {})
+
+    def test_04_fork_keeps_bidirectional_sync(self):
+        payload = self._build_payload(64)
+        self.mapping.update(payload)
+        sibling = self.mapping.fork()
+
+        self.assert_sized_mapping_matches(sibling, payload)
+
+        self.mapping["sentinel_wide"] = -(1 << 40)
+        self.assertEqual(sibling["sentinel_wide"], -(1 << 40))
+
+        sibling["sentinel_small"] = -1
+        sibling["sk_00001"] = -123
+        self.assertEqual(self.mapping["sentinel_small"], -1)
+        self.assertEqual(self.mapping["sk_00001"], -123)
+
+        popped = sibling.pop("sk_00000")
+        self.assertEqual(popped, payload["sk_00000"])
+        self.assertNotIn("sk_00000", self.mapping)
+
+        self.mapping.clear()
+        self.assertEqual(dict(self.mapping), {})
+        self.assertEqual(dict(sibling), {})
+
+    def test_05_rebind_to_raw_sized_replaces_state_and_tracks_source(self):
+        src_raw = ByteMapExSized()
+        expected = self._build_payload(48)
+        for key, value in expected.items():
+            src_raw[key] = value
+
+        self.mapping.update({"stale_a": 99, "stale_b": -11})
+        self.mapping.rebind(src_raw)
+        self.assert_sized_mapping_matches(self.mapping, expected)
+        self.assertNotIn("stale_a", self.mapping)
+        self.assertNotIn("stale_b", self.mapping)
+
+        src_raw["fresh"] = -(1 << 40)
+        expected["fresh"] = -(1 << 40)
+        self.assertEqual(self.mapping["fresh"], -(1 << 40))
+
+        src_raw.pop("sk_00000")
+        del expected["sk_00000"]
+        self.assertNotIn("sk_00000", self.mapping)
+
+        self.assert_sized_mapping_matches(self.mapping, expected)
+
+        src_raw.clear()
+        self.assertEqual(dict(self.mapping), {})
+
+    def test_06_rebind_to_bound_source_keeps_callback_sync(self):
+        src_bound = BoundByteMapExSized()
+        expected = {"p0": 10, "p1": -2, "p2": 0, "p3": 55}
+        src_bound.update(expected)
+
+        self.mapping.update({"legacy": 7})
+        self.mapping.rebind(src_bound)
+        self.assert_sized_mapping_matches(self.mapping, expected)
+        self.assertNotIn("legacy", self.mapping)
+
+        src_bound["p4"] = -(1 << 40)
+        expected["p4"] = -(1 << 40)
+        self.assertEqual(self.mapping["p4"], -(1 << 40))
+
+        popped = src_bound.pop("p0")
+        self.assertEqual(popped, 10)
+        del expected["p0"]
+        self.assertNotIn("p0", self.mapping)
+
+        self.assert_sized_mapping_matches(self.mapping, expected)
+
+        src_bound.clear()
+        self.assertEqual(dict(self.mapping), {})
+
+    def test_07_wide_values_survive_callback_paths(self):
+        source = BoundByteMapExSized()
+        values = {
+            "zero": 0,
+            "minus_one": -1,
+            "wide": 1 << 40,
+            "minus_wide": -(1 << 40),
+            "min": -(1 << 62),
+            "max": 1 << 62,
+        }
+        source.update(values)
+        observer = source.fork()
+
+        for key, expected in values.items():
+            self.assertIsInstance(observer[key], int)
+            self.assertEqual(observer[key], expected)
+
+        rebound = BoundByteMapExSized()
+        rebound.rebind(source)
+        for key, expected in values.items():
+            self.assertEqual(rebound[key], expected)
+
+    def test_08_value_coercion_and_invalid_inputs(self):
+        self.mapping["from_int"] = 1
+        self.mapping["from_bool"] = True
+        self.assertEqual(self.mapping["from_int"], 1)
+        self.assertEqual(self.mapping["from_bool"], 1)
+
+        with self.assertRaises(ValueError):
+            self.mapping["bad_str"] = "abc"
+
+        with self.assertRaises(OverflowError):
+            self.mapping["too_wide"] = 1 << 100
+
+        self.assertNotIn("bad_str", self.mapping)
+        self.assertNotIn("too_wide", self.mapping)
 
 
 if __name__ == '__main__':
