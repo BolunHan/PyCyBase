@@ -40,8 +40,8 @@ from .c_bytemap cimport (
     c_bytemap_entry_value_from_double, c_bytemap_entry_value_from_ssize_t,
 
     _ByteMapBase,
-    ByteMapEx, ByteMapExDouble, ByteMap,
+    ByteMapEx, ByteMapExDouble, ByteMapExSized, ByteMap,
     _BoundByteMapBase,
-    BoundByteMapEx, BoundByteMapExDouble, BoundByteMap, BoundByteSet,
+    BoundByteMapEx, BoundByteMapExDouble, BoundByteMapExSized, BoundByteMap, BoundByteSet,
     ByteMapPerformanceTestToolkit,
 )

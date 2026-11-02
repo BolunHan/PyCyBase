@@ -537,6 +537,214 @@ cdef class ByteMapExDouble(_ByteMapBase):
 
 
 # ============================================================
+#  ByteMapExSized - str -> ssize_t mapping
+# ============================================================
+
+cdef class ByteMapExSized(_ByteMapBase):
+    def __init__(self, size_t init_capacity=DEFAULT_BYTEMAP_CAPACITY):
+        self._init_header(sizeof(ssize_t), init_capacity)
+
+    cdef ssize_t c_get_sized(self, str key):
+        cdef size_t c_str_len = 0
+        cdef const char* c_str = ByteMapEx.c_key_to_string(key, &c_str_len)
+        cdef ssize_t out = 0
+        cdef int ret_code = c_bytemap_ex_get_ssize_t(self.header, c_str, c_str_len, &out)
+        if ret_code == bytemap_ret_code.BYTEMAP_OK:
+            return out
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_BUF:
+            raise ValueError('Uninitialized bytemap table')
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_KEY:
+            raise TypeError(f'Invalid key {key}')
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_NOT_FOUND:
+            raise KeyError(key)
+        else:
+            raise RuntimeError(f'c_bytemap_ex_get_ssize_t failed with err code: {ret_code}')
+
+    cdef void c_set_sized(self, str key, ssize_t value):
+        cdef size_t key_len = 0
+        cdef const char* key_ptr = ByteMapEx.c_key_to_string(key, &key_len)
+        cdef int ret_code = c_bytemap_ex_set_ssize_t(self.header, key_ptr, key_len, value, self.seq_id)
+        if ret_code == bytemap_ret_code.BYTEMAP_OK:
+            return
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_BUF:
+            raise ValueError('Uninitialized bytemap table')
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_KEY:
+            raise TypeError(f'Invalid key {key}')
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_FULL:
+            raise MemoryError('Mapping is full')
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_OOM:
+            raise MemoryError('Out of memory')
+        else:
+            raise RuntimeError(f'c_bytemap_ex_set_ssize_t failed with err code: {ret_code}')
+
+    cdef ssize_t c_set_default_sized(self, str key, ssize_t value):
+        cdef size_t key_len = 0
+        cdef const char* key_ptr = ByteMapEx.c_key_to_string(key, &key_len)
+        cdef ssize_t out = 0
+        cdef int ret_code = c_bytemap_ex_set_default_ssize_t(self.header, key_ptr, key_len, value, self.seq_id, &out)
+        if ret_code == bytemap_ret_code.BYTEMAP_OK:
+            return out
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_BUF:
+            raise ValueError('Uninitialized bytemap table')
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_KEY:
+            raise TypeError(f'Invalid key {key}')
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_FULL:
+            raise MemoryError('Mapping is full')
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_OOM:
+            raise MemoryError('Out of memory')
+        else:
+            raise RuntimeError(f'c_bytemap_ex_set_default_ssize_t failed with err code: {ret_code}')
+
+    cdef ssize_t c_pop_sized(self, str key):
+        cdef size_t c_str_len = 0
+        cdef const char* c_str = ByteMapEx.c_key_to_string(key, &c_str_len)
+        cdef ssize_t out = 0
+        cdef int ret_code = c_bytemap_ex_pop_ssize_t(self.header, c_str, c_str_len, self.seq_id, &out)
+        if ret_code == bytemap_ret_code.BYTEMAP_OK:
+            return out
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_BUF:
+            raise ValueError('Uninitialized bytemap table')
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_KEY:
+            raise TypeError(f'Invalid key {key}')
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_NOT_FOUND:
+            raise KeyError(key)
+        else:
+            raise RuntimeError(f'c_bytemap_ex_pop_ssize_t failed with err code: {ret_code}')
+
+    # === Python Interfaces ===
+
+    def __contains__(self, str key):
+        cdef size_t c_str_len = 0
+        cdef const char* c_str = ByteMapEx.c_key_to_string(key, &c_str_len)
+        cdef int ret_code = c_bytemap_ex_contains(self.header, c_str, c_str_len)
+        return ret_code == bytemap_ret_code.BYTEMAP_OK
+
+    def __getitem__(self, str key):
+        return self.c_get_sized(key)
+
+    def __setitem__(self, str key, ssize_t value):
+        self.c_set_sized(key, value)
+
+    def __repr__(self):
+        if self.header:
+            return (f"<{self.__class__.__name__} {<uintptr_t> self.header:#0x}>("
+                    f"size={self.header.size}, "
+                    f"slot_capacity={self.header.slot_capacity}, "
+                    f"occupied={self.header.occupied}, "
+                    f"capacity={self.header.capacity})")
+        return f"<{self.__class__.__name__} Unbound>"
+
+    def __copy__(self):
+        cdef bytemap* cloned = c_bytemap_ex_clone(self.header, AP_DEFAULT_ALLOCATOR)
+        if cloned == NULL:
+            raise MemoryError('Failed to clone ByteMapExSized')
+        cdef ByteMapExSized instance = ByteMapExSized.__new__(ByteMapExSized)
+        instance.header = cloned
+        instance.owner = True
+        instance.seq_id = c_bytemap_gen_seq_id(<void*> instance)
+        return instance
+
+    def __deepcopy__(self, memo):
+        return self.__copy__()
+
+    def __iter__(self):
+        cdef bytemap_entry* entry = self.header.first if self.header else NULL
+        while entry:
+            yield PyUnicode_FromStringAndSize(entry.key, entry.key_length)
+            entry = entry.next
+
+    def get(self, str key, object default=None, *):
+        cdef size_t c_str_len = 0
+        cdef const char* c_str = ByteMapEx.c_key_to_string(key, &c_str_len)
+        cdef ssize_t out = 0
+        cdef int ret_code = c_bytemap_ex_get_ssize_t(self.header, c_str, c_str_len, &out)
+        if ret_code == bytemap_ret_code.BYTEMAP_OK:
+            return out
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_BUF:
+            raise ValueError('Uninitialized bytemap table')
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_KEY:
+            raise TypeError(f'Invalid key {key}')
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_NOT_FOUND:
+            return default
+        else:
+            raise RuntimeError(f'c_bytemap_ex_get_ssize_t failed with err code: {ret_code}')
+
+    def set(self, str key, ssize_t value):
+        return self.c_set_sized(key, value)
+
+    def setdefault(self, str key, object default=NO_DEFAULT, *):
+        if default is NO_DEFAULT:
+            return self.c_get_sized(key)
+        return self.c_set_default_sized(key, <ssize_t> default)
+
+    def pop(self, str key, object default=NO_DEFAULT, *):
+        cdef size_t c_str_len = 0
+        cdef const char* c_str = ByteMapEx.c_key_to_string(key, &c_str_len)
+        cdef ssize_t out = 0
+        cdef int ret_code = c_bytemap_ex_pop_ssize_t(self.header, c_str, c_str_len, self.seq_id, &out)
+        if ret_code == bytemap_ret_code.BYTEMAP_OK:
+            return out
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_BUF:
+            raise ValueError('Uninitialized bytemap table')
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_KEY:
+            raise TypeError(f'Invalid key {key}')
+        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_NOT_FOUND:
+            if default is NO_DEFAULT:
+                raise KeyError(key)
+            else:
+                return default
+        else:
+            raise RuntimeError(f'c_bytemap_ex_pop_ssize_t failed with err code: {ret_code}')
+
+    def contains(self, str key):
+        cdef size_t c_str_len = 0
+        cdef const char* c_str = ByteMapEx.c_key_to_string(key, &c_str_len)
+        cdef int ret_code = c_bytemap_ex_contains(self.header, c_str, c_str_len)
+        return ret_code == bytemap_ret_code.BYTEMAP_OK
+
+    def keys(self):
+        cdef bytemap_entry* entry = self.header.first if self.header else NULL
+        while entry:
+            yield PyUnicode_FromStringAndSize(entry.key, entry.key_length)
+            entry = entry.next
+
+    def values(self):
+        cdef bytemap_entry* entry = self.header.first if self.header else NULL
+        while entry:
+            yield (<ssize_t*> entry.value)[0]
+            entry = entry.next
+
+    def items(self):
+        cdef bytemap_entry* entry = self.header.first if self.header else NULL
+        while entry:
+            yield (PyUnicode_FromStringAndSize(entry.key, entry.key_length),
+                   (<ssize_t*> entry.value)[0])
+            entry = entry.next
+
+    def fork(self):
+        cdef ByteMapExSized instance = ByteMapExSized.__new__(ByteMapExSized)
+        instance.header = self.header
+        instance.owner = False
+        instance.seq_id = c_bytemap_gen_seq_id(<void*> instance)
+        return instance
+
+    property as_dict:
+        def __get__(self):
+            cdef out = {}
+            if not self.header:
+                return out
+            cdef bytemap_entry* entry = self.header.first
+            cdef str key
+            cdef ssize_t value
+            while entry:
+                key = PyUnicode_FromStringAndSize(entry.key, entry.key_length)
+                value = (<ssize_t*> entry.value)[0]
+                out[key] = value
+                entry = entry.next
+            return out
+
+
+# ============================================================
 #  ByteMap - str/bytes -> PyObject* mapping (void* variant)
 # ============================================================
 
@@ -1343,6 +1551,40 @@ cdef class BoundByteMapExDouble(_BoundByteMapBase):
         cdef PyObject* py_value = PyFloat_FromDouble((<double*> value)[0])
         Py_XINCREF(py_value)
         return <object> py_value
+
+    property ws:
+        def __get__(self):
+            return self.ws
+
+
+# ============================================================
+#  BoundByteMapExSized - synchronized dict (str -> ssize_t)
+# ============================================================
+
+cdef class BoundByteMapExSized(_BoundByteMapBase):
+    def __init__(self, *args, **kwargs):
+        self._init_bound_header(sizeof(ssize_t))
+        super().__init__()
+        cdef dict payload = dict(*args, **kwargs)
+        if payload:
+            self.c_update(payload)
+
+    @staticmethod
+    cdef BoundByteMapExSized c_from_header(bytemap* header, bint owner=False):
+        cdef BoundByteMapExSized instance = BoundByteMapExSized.__new__(BoundByteMapExSized)
+        instance.owner = owner
+        instance.seq_id = c_bytemap_gen_seq_id(<void*> instance)
+        instance.c_bind(header)
+        return instance
+
+    cdef const char* c_serialize_value(self, object obj, size_t* value_len):
+        self.ws = <ssize_t> int(obj)
+        if value_len:
+            value_len[0] = sizeof(ssize_t)
+        return <const char*> &self.ws
+
+    cdef object c_deserialize_value(self, const char* value, size_t value_len):
+        return (<ssize_t*> value)[0]
 
     property ws:
         def __get__(self):

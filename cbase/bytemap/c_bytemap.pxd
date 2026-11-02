@@ -209,6 +209,20 @@ cdef class ByteMapExDouble(_ByteMapBase):
 
 
 # ============================================================
+#  ByteMapExSized — str → ssize_t mapping
+# ============================================================
+
+cdef class ByteMapExSized(_ByteMapBase):
+    cdef ssize_t c_get_sized(self, str key)
+
+    cdef void c_set_sized(self, str key, ssize_t value)
+
+    cdef ssize_t c_set_default_sized(self, str key, ssize_t value)
+
+    cdef ssize_t c_pop_sized(self, str key)
+
+
+# ============================================================
 #  ByteMap — str/bytes → PyObject* mapping (void* variant)
 # ============================================================
 
@@ -299,6 +313,17 @@ cdef class BoundByteMapExDouble(_BoundByteMapBase):
 
     @staticmethod
     cdef BoundByteMapExDouble c_from_header(bytemap* header, bint owner=?)
+
+
+# ============================================================
+#  BoundByteMapExSized — synchronized dict (str → ssize_t)
+# ============================================================
+
+cdef class BoundByteMapExSized(_BoundByteMapBase):
+    cdef ssize_t ws
+
+    @staticmethod
+    cdef BoundByteMapExSized c_from_header(bytemap* header, bint owner=?)
 
 
 # ============================================================
