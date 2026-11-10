@@ -14,4 +14,6 @@ from .pylong cimport (
     pylong_from_int128,
     pylong_as_uint128,
     pylong_as_int128,
+
+    SIZED_FORMAT
 )

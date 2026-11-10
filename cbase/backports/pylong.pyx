@@ -2,6 +2,7 @@ from cpython.bytes cimport PyBytes_FromStringAndSize
 
 from cbase.int128 cimport c_read_uint128, c_write_uint128, c_read_int128, c_write_int128
 
+cdef str SIZED_FORMAT = get_sized_format()
 
 globals()['_UINT128_MAX'] = _UINT128_MAX = (1 << 128) - 1
 globals()['_INT128_MAX'] = _INT128_MAX = (1 << 127) - 1
@@ -59,3 +60,19 @@ cpdef bytes pylong_as_int128(object val):
     cdef bytes out = PyBytes_FromStringAndSize(NULL, 16)
     c_write_int128(<char*> out, v)
     return out
+
+
+cpdef str get_sized_format():
+    # Supported seamlessly by Python 3's struct / buffer engine
+    cdef str native_format = "N"
+
+    # 2. Explicit architectural type-matching safety check
+    if sizeof(size_t) == 8:
+        # Check if we are on a Windows 64-bit platform (LLP64 environment)
+        # where long ("L") is only 4 bytes, requiring unsigned long long ("Q")
+        if sizeof(long) == 4:
+            return "Q"  # 8-byte unsigned integer (unsigned long long)
+        else:
+            return "L"  # 8-byte unsigned integer (unsigned long)
+    else:
+        return "I"      # 4-byte unsigned integer (unsigned int)
