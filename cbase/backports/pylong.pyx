@@ -2,7 +2,8 @@ from cpython.bytes cimport PyBytes_FromStringAndSize
 
 from cbase.int128 cimport c_read_uint128, c_write_uint128, c_read_int128, c_write_int128
 
-cdef str SIZED_FORMAT = get_sized_format()
+cdef str UNSIGNED_SIZED_FORMAT = get_unsigned_sized_format()
+cdef str SIGNED_SIZED_FORMAT = get_sized_format()
 
 globals()['_UINT128_MAX'] = _UINT128_MAX = (1 << 128) - 1
 globals()['_INT128_MAX'] = _INT128_MAX = (1 << 127) - 1
@@ -62,7 +63,7 @@ cpdef bytes pylong_as_int128(object val):
     return out
 
 
-cpdef str get_sized_format():
+cpdef str get_unsigned_sized_format():
     # Supported seamlessly by Python 3's struct / buffer engine
     cdef str native_format = "N"
 
@@ -76,3 +77,21 @@ cpdef str get_sized_format():
             return "L"  # 8-byte unsigned integer (unsigned long)
     else:
         return "I"      # 4-byte unsigned integer (unsigned int)
+
+
+cpdef str get_sized_format():
+    # Signed counterpart of get_unsigned_sized_format(): Py_ssize_t is the
+    # signed type whose width tracks size_t, and Python's struct exposes it
+    # natively as "n".
+    cdef str native_format = "n"
+
+    # 2. Explicit architectural type-matching safety check
+    if sizeof(Py_ssize_t) == 8:
+        # Check if we are on a Windows 64-bit platform (LLP64 environment)
+        # where long ("l") is only 4 bytes, requiring signed long long ("q")
+        if sizeof(long) == 4:
+            return "q"  # 8-byte signed integer (signed long long)
+        else:
+            return "l"  # 8-byte signed integer (signed long)
+    else:
+        return "i"      # 4-byte signed integer (signed int)

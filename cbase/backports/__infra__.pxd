@@ -15,5 +15,6 @@ from .pylong cimport (
     pylong_as_uint128,
     pylong_as_int128,
 
-    SIZED_FORMAT
+    UNSIGNED_SIZED_FORMAT,
+    SIGNED_SIZED_FORMAT
 )

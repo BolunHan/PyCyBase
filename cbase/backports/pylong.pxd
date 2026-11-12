@@ -9,7 +9,8 @@ cdef extern from "cbase/backports/pylong.h":
     Py_ssize_t PyLong_AsUInt128(PyObject* obj, uint128_t* value)
     Py_ssize_t PyLong_AsInt128(PyObject* obj, int128_t* value)
 
-cdef str SIZED_FORMAT
+cdef str UNSIGNED_SIZED_FORMAT
+cdef str SIGNED_SIZED_FORMAT
 
 cdef object _UINT128_MAX
 cdef object _INT128_MAX
@@ -22,5 +23,7 @@ cpdef object pylong_from_int128(bytes buf)
 cpdef bytes pylong_as_uint128(object val)
 
 cpdef bytes pylong_as_int128(object val)
+
+cpdef str get_unsigned_sized_format()
 
 cpdef str get_sized_format()
