@@ -7,9 +7,21 @@ pylong_as_int128 convert between Python int and 16-byte little-endian
 Oracle: Python's built-in int.to_bytes / int.from_bytes with matching
 byte order and signedness flags.
 """
+import ctypes
+import struct
 import unittest
 
-from cbase.backports.pylong import _INT128_MAX, _INT128_MIN, _UINT128_MAX, pylong_as_int128, pylong_as_uint128, pylong_from_int128, pylong_from_uint128
+from cbase.backports.pylong import (
+    _INT128_MAX,
+    _INT128_MIN,
+    _UINT128_MAX,
+    get_sized_format,
+    get_unsigned_sized_format,
+    pylong_as_int128,
+    pylong_as_uint128,
+    pylong_from_int128,
+    pylong_from_uint128,
+)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -331,6 +343,48 @@ class TestBoolIsInt(unittest.TestCase):
         """False → 0 as int128_t."""
         result = pylong_from_int128(pylong_as_int128(False))
         self.assertEqual(result, 0)
+
+
+class TestSizedFormat(unittest.TestCase):
+    """Contract: get_unsigned_sized_format / get_sized_format return the
+    struct module code for size_t / ssize_t on the running platform."""
+
+    def test_00_unsigned_format_matches_size_t(self) -> None:
+        """The unsigned code has the same width as C size_t."""
+        fmt = get_unsigned_sized_format()
+        self.assertIsInstance(fmt, str)
+        self.assertEqual(len(fmt), 1)
+        self.assertEqual(struct.calcsize(fmt), ctypes.sizeof(ctypes.c_size_t))
+
+    def test_01_signed_format_matches_ssize_t(self) -> None:
+        """The signed code has the same width as C ssize_t."""
+        fmt = get_sized_format()
+        self.assertIsInstance(fmt, str)
+        self.assertEqual(len(fmt), 1)
+        self.assertEqual(struct.calcsize(fmt), ctypes.sizeof(ctypes.c_ssize_t))
+
+    def test_02_signed_is_unsigned_counterpart(self) -> None:
+        """The two codes differ only in signedness, so widths always agree."""
+        unsigned = get_unsigned_sized_format()
+        signed = get_sized_format()
+        self.assertEqual(signed, unsigned.lower())
+        self.assertEqual(struct.calcsize(signed), struct.calcsize(unsigned))
+
+    def test_03_unsigned_format_rejects_negative(self) -> None:
+        """The unsigned code rejects -1 instead of wrapping."""
+        with self.assertRaises(struct.error):
+            struct.pack(get_unsigned_sized_format(), -1)
+
+    def test_04_signed_format_is_signed(self) -> None:
+        """The signed code packs -1 as all-ones and round-trips the limits."""
+        fmt = get_sized_format()
+        nbytes = ctypes.sizeof(ctypes.c_ssize_t)
+        self.assertEqual(struct.pack(fmt, -1), b'\xff' * nbytes)
+
+        for value in (-(1 << (8 * nbytes - 1)), 0, (1 << (8 * nbytes - 1)) - 1):
+            self.assertEqual(
+                struct.unpack(fmt, struct.pack(fmt, value))[0], value
+            )
 
 
 if __name__ == '__main__':
