@@ -14,14 +14,14 @@ cpdef object pylong_from_uint128(bytes buf):
     if len(buf) != 16:
         raise ValueError(f"expected 16 bytes, got {len(buf)}")
     cdef uint128_t val = c_read_uint128(<const char*> buf)
-    return <object> PyLong_FromUInt128(val)
+    return PyLong_FromUInt128(val)
 
 
 cpdef object pylong_from_int128(bytes buf):
     if len(buf) != 16:
         raise ValueError(f"expected 16 bytes, got {len(buf)}")
     cdef int128_t val = c_read_int128(<const char*> buf)
-    return <object> PyLong_FromInt128(val)
+    return PyLong_FromInt128(val)
 
 
 cpdef bytes pylong_as_uint128(object val):

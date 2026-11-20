@@ -4,8 +4,8 @@ from cbase.int128 cimport uint128_t, int128_t
 
 
 cdef extern from "cbase/backports/pylong.h":
-    PyObject*  PyLong_FromUInt128(uint128_t value)
-    PyObject*  PyLong_FromInt128(int128_t value)
+    object     PyLong_FromUInt128(uint128_t value)
+    object     PyLong_FromInt128(int128_t value)
     Py_ssize_t PyLong_AsUInt128(PyObject* obj, uint128_t* value)
     Py_ssize_t PyLong_AsInt128(PyObject* obj, int128_t* value)
 
