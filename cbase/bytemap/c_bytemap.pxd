@@ -17,7 +17,6 @@ cdef extern from "Python.h":
     void PyDict_Clear(PyObject* p)
     int PyDict_SetItemString(PyObject* p, const char* key, PyObject* val)
     PyObject* PyDict_GetItemString(PyObject* p, const char* key)
-    PyObject* PyFloat_FromDouble(double v)
     void PyErr_Clear()
 
 

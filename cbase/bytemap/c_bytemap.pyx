@@ -1,6 +1,7 @@
 from time import perf_counter
 
 from cpython.bytes cimport PyBytes_AsString, PyBytes_FromStringAndSize, PyBytes_GET_SIZE
+from cpython.float cimport PyFloat_FromDouble
 from cpython.mem cimport PyMem_Free, PyMem_Malloc
 from cpython.ref cimport Py_XDECREF
 from cpython.unicode cimport PyUnicode_AsUTF8AndSize, PyUnicode_FromStringAndSize
@@ -1553,13 +1554,7 @@ cdef class BoundByteMapExDouble(_BoundByteMapBase):
         return <const char*> &self.ws
 
     cdef object c_deserialize_value(self, const char* value, size_t value_len):
-        cdef PyObject* py_value = PyFloat_FromDouble((<double*> value)[0])
-        cdef object result
-        if py_value == NULL:
-            raise MemoryError('Failed to allocate a Python float')
-        result = <object> py_value
-        Py_XDECREF(py_value)
-        return result
+        return PyFloat_FromDouble((<double*> value)[0])
 
     property ws:
         def __get__(self):
