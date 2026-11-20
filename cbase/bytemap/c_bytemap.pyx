@@ -1548,9 +1548,7 @@ cdef class BoundByteMapExDouble(_BoundByteMapBase):
         return <const char*> &self.ws
 
     cdef object c_deserialize_value(self, const char* value, size_t value_len):
-        cdef PyObject* py_value = PyFloat_FromDouble((<double*> value)[0])
-        Py_XINCREF(py_value)
-        return <object> py_value
+        return float((<double*> value)[0])
 
     property ws:
         def __get__(self):
