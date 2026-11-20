@@ -3,6 +3,7 @@
 Port of Quark test_10_c_bytemapex.py, adapted for PyCyBase.
 """
 import math
+import sys
 import time
 import unittest
 
@@ -522,6 +523,17 @@ class TestBoundByteMapEx(unittest.TestCase):
         self.assertNotIn("big", self.mapping)
         self.assertEqual(dict(self.mapping), {})
 
+    def test_10_pop_does_not_leak_reference(self):
+        """Popping must return the owned dict reference without leaving extras behind."""
+        value = b"pop-refcount-probe"
+        self.mapping["probe"] = value
+        before = sys.getrefcount(value)
+
+        popped = self.mapping.pop("probe")
+
+        self.assertIs(popped, value)
+        self.assertEqual(sys.getrefcount(value), before)
+
 
 class TestBoundByteMapExDouble(unittest.TestCase):
     """Contract:
@@ -732,6 +744,15 @@ class TestBoundByteMapExDouble(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             self.mapping.rebind({})
+
+    def test_09_deserialization_does_not_leak_reference(self):
+        """A forked view must own exactly one reference to each deserialized float."""
+        self.mapping["probe"] = 1.25
+        forked = self.mapping.fork()
+        value = forked["probe"]
+
+        # refs: forked's dict + local value + getrefcount argument.
+        self.assertEqual(sys.getrefcount(value), 3)
 
 
 class TestByteMapExPatchedBehavior(unittest.TestCase):

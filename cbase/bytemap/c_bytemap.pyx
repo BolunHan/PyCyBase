@@ -2,7 +2,7 @@ from time import perf_counter
 
 from cpython.bytes cimport PyBytes_AsString, PyBytes_FromStringAndSize, PyBytes_GET_SIZE
 from cpython.mem cimport PyMem_Free, PyMem_Malloc
-from cpython.ref cimport Py_XINCREF
+from cpython.ref cimport Py_XDECREF
 from cpython.unicode cimport PyUnicode_AsUTF8AndSize, PyUnicode_FromStringAndSize
 from libc.math cimport NAN
 from libc.stdlib cimport calloc, free
@@ -1393,6 +1393,7 @@ cdef class _BoundByteMapBase(dict):
         cdef size_t c_key_len = 0
         cdef const char* c_key = self.c_serialize_key(py_key, &c_key_len)
         cdef PyObject* py_value = NULL
+        cdef object result
 
         if BP_PyDict_Pop(<PyObject*> self, <PyObject*> py_key, &py_value) < 0:
             PyErr_Clear()
@@ -1401,11 +1402,15 @@ cdef class _BoundByteMapBase(dict):
 
         if ret_code == bytemap_ret_code.BYTEMAP_OK:
             if py_value:
-                Py_XINCREF(py_value)
-                return <object> py_value
+                result = <object> py_value
+                Py_XDECREF(py_value)
+                return result
             else:
                 raise BufferError('c_pop succeeded but failed to pop from python dict cache. Likely caused by a buffer corruption.')
-        elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_BUF:
+
+        Py_XDECREF(py_value)
+
+        if ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_BUF:
             raise ValueError('Invalid args')
         elif ret_code == bytemap_ret_code.BYTEMAP_ERR_INVALID_KEY:
             raise KeyError(f'Invalid key {py_key}')
@@ -1548,7 +1553,13 @@ cdef class BoundByteMapExDouble(_BoundByteMapBase):
         return <const char*> &self.ws
 
     cdef object c_deserialize_value(self, const char* value, size_t value_len):
-        return float((<double*> value)[0])
+        cdef PyObject* py_value = PyFloat_FromDouble((<double*> value)[0])
+        cdef object result
+        if py_value == NULL:
+            raise MemoryError('Failed to allocate a Python float')
+        result = <object> py_value
+        Py_XDECREF(py_value)
+        return result
 
     property ws:
         def __get__(self):
