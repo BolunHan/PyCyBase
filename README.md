@@ -140,13 +140,20 @@ setup(ext_modules=cythonize([ext]))
 
 ### Cython Include Injection
 
-`pip install -U . --no-build-isolation` and `pip install -e .` call
-`cbase.cython_injection.inject_cython_includes` from `setup.py`. It finds the
-target environment, checks that Cython is installed there, and links:
+A source install (`pip install -U . --no-build-isolation` or
+`pip install -e .`) calls `cbase.cython_injection.inject_cython_includes`
+from `setup.py`. It finds the target environment, checks that Cython is
+installed there, and links:
 
 ```text
 <site-packages>/Cython/Includes/cbase -> ../../cbase
 ```
+
+Editable installs link the source tree; a wheel build links the installed
+copy, and a direct `python setup.py build_ext --inplace` does not inject.
+Built and published wheels ship a startup hook (`_cbase_cython_link.pth`)
+that creates the same link on the first interpreter start; it does nothing
+when Cython is not installed in that environment.
 
 The same function is reusable from downstream packages such as PyAlgoEngine:
 
@@ -162,9 +169,9 @@ inject_cython_includes(
 ```
 
 Calls return a status (`injected`, `already-injected`, `conflict`,
-`skipped-no-cython`, ...) instead of raising. The wheel records the link in
-its `RECORD`, so `pip uninstall` removes it automatically; for installs that
-predate this behavior, `uninject_cython_includes` removes it manually. See
+`skipped-no-cython`, ...) instead of raising. The link lives outside the
+package tree, so `pip uninstall` leaves it behind; call
+`uninject_cython_includes` to remove it manually. See
 `docs/cython_injection.rst` for the full API.
 
 ## Modules
