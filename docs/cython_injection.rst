@@ -12,8 +12,10 @@ is installed there, and maintains a relative symlink:
    <site-packages>/Cython/Includes/<package> -> ../../<package>
 
 The module is standard-library only and is reused by the PyCyBase ``setup.py``
-so source installs inject automatically.  Other packages can call the same
-entry points, for example ``PyAlgoEngine`` (import name ``algo_engine``).
+so source installs inject automatically; wheels ship a startup hook that
+performs the same injection on the first interpreter start.  Other packages
+can call the same entry points, for example ``PyAlgoEngine`` (import name
+``algo_engine``).
 
 Public API
 ----------
@@ -26,7 +28,7 @@ Public API
 
 .. autofunction:: cbase.cython_injection.cython_injection_path
 
-.. autofunction:: cbase.cython_injection.record_cython_include
+.. autofunction:: cbase.cython_injection.ensure_wheel_site_hook
 
 .. autofunction:: cbase.cython_injection.resolve_site_packages
 
@@ -100,19 +102,21 @@ Calling ``inject_cython_includes`` twice is safe: the second call reports
 ``already-injected``.  ``uninject_cython_includes`` removes only symlinks;
 a real directory at the link path reports ``conflict`` and is preserved.
 
-Uninstall cleanup
------------------
+Wheel installs and removal
+--------------------------
 
-``pip`` removes a distribution's files from the paths listed in its
-``RECORD``.  The injected link lives outside the package tree, so the build
-records ``Cython/Includes/<package>`` in the wheel's ``RECORD`` through
-``record_cython_include``.  Both the normal ``bdist_wheel`` path and the
-PEP 660 ``editable_wheel`` path do this, so ``pip uninstall`` removes the
-link together with the package.
+A wheel runs no code at installation time, so ``ensure_wheel_site_hook`` adds
+a ``.pth`` file and its startup module to the built wheel.  At interpreter
+startup that module creates the same relative link, and it is a no-op when
+Cython is not installed, when the link already resolves, or when a real entry
+occupies the link path.  The PEP 660 ``editable_wheel`` path ships the same
+hook.
 
-``pip`` only removes the link while its target exists.  If an install predates
-this behavior, or the target was deleted first, call
-``uninject_cython_includes(package)`` manually.
+The link lives outside the package tree and is deliberately not listed in the
+wheel's ``RECORD``: every ``RECORD`` path has to exist inside the archive, and
+tools such as ``auditwheel`` fail on a missing member.  ``pip uninstall``
+therefore leaves the link behind; call ``uninject_cython_includes(package)``
+to remove it manually.
 
 Windows
 -------
