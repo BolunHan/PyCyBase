@@ -31,6 +31,8 @@ turn those statuses into :class:`CythonInjectionError`.
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import importlib.util
 import logging
 import os
@@ -57,6 +59,8 @@ SKIPPED_NO_ENVIRONMENT = "skipped-no-environment"
 
 _SUCCESS = frozenset({INJECTED, ALREADY_INJECTED, UNINJECTED, NOT_INJECTED})
 
+SITE_HOOK_MODULE = "_cbase_cython_link"
+
 __all__ = [
     "ALREADY_INJECTED",
     "CONFLICT",
@@ -64,14 +68,15 @@ __all__ = [
     "FAILED",
     "INJECTED",
     "NOT_INJECTED",
+    "SITE_HOOK_MODULE",
     "SKIPPED_NO_CYTHON",
     "SKIPPED_NO_ENVIRONMENT",
     "SKIPPED_NO_PACKAGE",
     "UNINJECTED",
     "cython_injection_path",
     "cython_injection_status",
+    "ensure_wheel_site_hook",
     "inject_cython_includes",
-    "record_cython_include",
     "resolve_cython_includes",
     "resolve_site_packages",
     "uninject_cython_includes",
@@ -428,54 +433,93 @@ def cython_injection_status(
     return NOT_INJECTED
 
 
-def record_cython_include(
-        wheel_path: str | os.PathLike[str],
-        package: str = "cbase",
-        *,
-        name: str | None = None,
-) -> bool:
-    """Append the ``Cython/Includes`` entry to a wheel's ``RECORD``.
+def _record_line(name: str, data: bytes) -> str:
+    """Return a ``RECORD`` line carrying *data*'s hash and size."""
+    digest = base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b"=")
+    return f"{name},sha256={digest.decode('ascii')},{len(data)}"
 
-    ``pip uninstall`` removes the paths listed in the installed distribution's
-    ``RECORD``.  The injected link lives outside the package tree, so a wheel
-    built for this package must list it there to let pip remove it during
-    uninstall.
+
+def _extend_record(record: bytes, added: dict[str, bytes]) -> bytes:
+    """Append *added* members to a wheel ``RECORD`` payload."""
+    lines = record.decode("utf-8").splitlines()
+    known = {line.split(",", 1)[0] for line in lines}
+    for name, data in added.items():
+        if name not in known:
+            lines.append(_record_line(name, data))
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
+def ensure_wheel_site_hook(
+        wheel_path: str | os.PathLike[str],
+        module_source: str | os.PathLike[str],
+        *,
+        module_name: str = SITE_HOOK_MODULE,
+) -> bool:
+    """Ship the ``Cython/Includes`` startup hook inside a built wheel.
+
+    A wheel runs no code at installation time, so the wheel carries a ``.pth``
+    file that imports *module_name* at interpreter startup; that module
+    creates the ``Cython/Includes`` link in the environment it was installed
+    into.
+
+    Both members are added to ``RECORD`` with their real hash and size, and
+    every path listed in ``RECORD`` exists in the archive: tools such as
+    ``auditwheel`` open each listed member and fail on a missing one.
 
     Args:
         wheel_path: Path to a built ``.whl`` file.
-        package: Top-level import name of the package.
-        name: Entry name under ``Cython/Includes``.  Defaults to the last
-            component of *package*.
+        module_source: Path to the startup hook module's source file.
+        module_name: Top-level module name to install and import.
 
     Returns:
-        ``True`` when the entry was added, ``False`` when it was already
-        present, the wheel has no ``RECORD``, or the wheel cannot be read.
+        ``True`` when the wheel carries the startup hook afterwards,
+        ``False`` when the wheel, its ``RECORD`` or the source cannot be read.
     """
     wheel_path = Path(wheel_path)
-    entry = f"Cython/Includes/{_link_name(package, name)}"
-    temp_path = wheel_path.with_name(wheel_path.name + ".tmp")
-    added = False
     try:
-        with zipfile.ZipFile(wheel_path) as source, zipfile.ZipFile(temp_path, "w") as target:
-            for item in source.infolist():
-                data = source.read(item.filename)
-                if item.filename.endswith(".dist-info/RECORD"):
-                    text = data.decode("utf-8")
-                    names = {line.split(",", 1)[0] for line in text.splitlines()}
-                    if entry not in names:
-                        text = text.rstrip("\n") + "\n" + entry + ",,\n"
-                        added = True
-                    data = text.encode("utf-8")
-                target.writestr(item, data)
-        if added:
-            os.replace(temp_path, wheel_path)
-        else:
-            temp_path.unlink(missing_ok=True)
+        module_data = Path(module_source).read_bytes()
+    except OSError as exc:
+        LOGGER.warning("could not read %s: %s", module_source, exc)
+        return False
+
+    module_file = f"{module_name}.py"
+    pth_file = f"{module_name}.pth"
+    candidates = {
+        module_file: module_data,
+        pth_file: f"import {module_name}\n".encode("utf-8"),
+    }
+
+    temp_path = wheel_path.with_name(wheel_path.name + ".tmp")
+    try:
+        with zipfile.ZipFile(wheel_path) as source:
+            names = set(source.namelist())
+            record_name = next(
+                (name for name in names if name.endswith(".dist-info/RECORD")),
+                None,
+            )
+            if record_name is None:
+                return False
+
+            added = {name: data for name, data in candidates.items() if name not in names}
+            if not added:
+                return True
+            with zipfile.ZipFile(temp_path, "w") as target:
+                for item in source.infolist():
+                    data = source.read(item.filename)
+                    if item.filename == record_name:
+                        data = _extend_record(data, added)
+                    target.writestr(item, data)
+                for name, data in added.items():
+                    info = zipfile.ZipInfo(name)
+                    info.external_attr = 0o644 << 16
+                    info.compress_type = zipfile.ZIP_DEFLATED
+                    target.writestr(info, data)
+        os.replace(temp_path, wheel_path)
     except (OSError, zipfile.BadZipFile) as exc:
         temp_path.unlink(missing_ok=True)
-        LOGGER.warning("could not record %s in %s: %s", entry, wheel_path, exc)
+        LOGGER.warning("could not add the Cython include startup hook to %s: %s", wheel_path, exc)
         return False
-    return added
+    return True
 
 
 def cython_injection_path(

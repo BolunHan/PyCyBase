@@ -25,8 +25,8 @@ from .cython_injection import (  # noqa: E402
     CythonInjectionError,
     cython_injection_path,
     cython_injection_status,
+    ensure_wheel_site_hook,
     inject_cython_includes,
-    record_cython_include,
     uninject_cython_includes,
 )
 
@@ -73,7 +73,7 @@ __all__ = [
     'CythonInjectionError',
     'cython_injection_path',
     'cython_injection_status',
+    'ensure_wheel_site_hook',
     'inject_cython_includes',
-    'record_cython_include',
     'uninject_cython_includes',
 ]
