@@ -5,9 +5,11 @@ extensions or touching the real environment.
 
 Expected behavior:
     - the injection module is loaded by file path and never imports cbase;
-    - editable builds pass ``editable=True`` and wheel builds ``False``;
+    - wheel builds pass ``editable=False``;
+    - PEP 660 editable builds pass ``editable=True``;
+    - a direct ``build_ext --inplace`` skips injection entirely;
     - a successful link is printed with its relative target;
-    - an injection exception is printed as a warning and never escapes.
+    - a missing Cython and an injection exception are reported, never raised.
 """
 import builtins
 import io
@@ -22,7 +24,7 @@ import setup
 class _FakeBuild:
     """Minimal stand-in for BuildExtWithConfig."""
 
-    inplace = True
+    inplace = False
     inject_cython_includes = setup.BuildExtWithConfig.inject_cython_includes
 
 
@@ -58,6 +60,7 @@ class TestHook(unittest.TestCase):
         class FakeModule:
             INJECTED = 'injected'
             ALREADY_INJECTED = 'already-injected'
+            SKIPPED_NO_CYTHON = 'skipped-no-cython'
 
             @staticmethod
             def inject_cython_includes(package, **kwargs):
@@ -71,15 +74,20 @@ class TestHook(unittest.TestCase):
         FakeModule.calls = {}
         return FakeModule
 
-    def test_00_editable_build_passes_inplace(self) -> None:
-        """Editable builds link the source tree."""
+    def test_00_editable_wheel_passes_editable(self) -> None:
+        """PEP 660 editable builds link the source tree."""
         module = self._module('injected', Path('/fake/Cython/Includes/cbase'))
+
+        class EditableBuild(_FakeBuild):
+            inplace = True
+
         with (
             mock.patch.object(setup, '_load_cython_injection', return_value=module),
             mock.patch.object(setup.os, 'readlink', return_value='../../../../cbase'),
+            mock.patch.object(setup.sys, 'argv', ['setup.py', 'editable_wheel', '--dist-dir', '/tmp']),
             redirect_stdout(io.StringIO()) as out,
         ):
-            _FakeBuild().inject_cython_includes()
+            EditableBuild().inject_cython_includes()
         self.assertEqual(module.calls['package'], 'cbase')
         self.assertTrue(module.calls['editable'])
         self.assertIn('Cython/Includes/cbase -> ../../../../cbase', out.getvalue())
@@ -88,28 +96,41 @@ class TestHook(unittest.TestCase):
         """Wheel builds link the installed copy."""
         module = self._module('injected', Path('/fake/Cython/Includes/cbase'))
 
-        class WheelBuild(_FakeBuild):
-            inplace = False
-
         with (
             mock.patch.object(setup, '_load_cython_injection', return_value=module),
             mock.patch.object(setup.os, 'readlink', return_value='../../cbase'),
             redirect_stdout(io.StringIO()),
         ):
-            WheelBuild().inject_cython_includes()
+            _FakeBuild().inject_cython_includes()
         self.assertFalse(module.calls['editable'])
 
-    def test_02_skip_is_reported(self) -> None:
-        """A skipped injection prints the status instead of a link."""
+    def test_02_inplace_build_is_skipped(self) -> None:
+        """A direct ``build_ext --inplace`` leaves Cython/Includes untouched."""
+        loader = mock.Mock(side_effect=AssertionError('loader must not run'))
+
+        class InplaceBuild(_FakeBuild):
+            inplace = True
+
+        with (
+            mock.patch.object(setup, '_load_cython_injection', loader),
+            mock.patch.object(setup.sys, 'argv', ['setup.py', 'build_ext', '--inplace']),
+            redirect_stdout(io.StringIO()) as out,
+        ):
+            InplaceBuild().inject_cython_includes()
+        loader.assert_not_called()
+        self.assertIn('in-place build: Cython include injection skipped', out.getvalue())
+
+    def test_03_missing_cython_is_reported(self) -> None:
+        """A skipped injection prints the reason instead of a link."""
         module = self._module('skipped-no-cython', None)
         with (
             mock.patch.object(setup, '_load_cython_injection', return_value=module),
             redirect_stdout(io.StringIO()) as out,
         ):
             _FakeBuild().inject_cython_includes()
-        self.assertIn('Cython include injection: skipped-no-cython', out.getvalue())
+        self.assertIn('Cython is not installed in the target environment', out.getvalue())
 
-    def test_03_exception_is_warned(self) -> None:
+    def test_04_exception_is_warned(self) -> None:
         """An injection exception never escapes the build hook."""
         with (
             mock.patch.object(setup, '_load_cython_injection', side_effect=RuntimeError('boom')),
