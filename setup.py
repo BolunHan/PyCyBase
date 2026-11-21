@@ -35,6 +35,7 @@ COMPILE_FLAGS = ["/Ox", "/std:c17", "/experimental:c11atomics"] if platform.syst
 REPO_ROOT = os.path.abspath(os.path.dirname(__file__))
 N_CORES = os.cpu_count() or 1
 N_THREADS = 0 if (platform.system() == "Windows" or NO_MARCH_NATIVE) else max(1, N_CORES - 2)
+_EDITABLE_COMMANDS = frozenset({"editable_wheel", "develop"})
 __VERSION__ = match.group(1) if (match := re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']', (Path(REPO_ROOT) / PACKAGE_NAME / '__init__.py').read_text(), re.MULTILINE)) else "unknown"
 
 
@@ -151,17 +152,25 @@ class BuildExtWithConfig(build_ext):
     def inject_cython_includes(self) -> None:
         """Link the package into the target environment's Cython/Includes.
 
-        Editable builds (``build_ext.inplace``) point at the source tree;
-        wheel builds point at the copy being installed into site-packages.
+        Editable installs point the link at the source tree; wheel builds
+        point it at the copy being installed into site-packages.  A direct
+        ``build_ext --inplace`` is skipped: it would target whichever
+        environment ran the build, while installed wheels maintain the link
+        through their startup hook instead.
+
         Failure never aborts an install: the package remains usable, only
         cross-package ``cimport`` would lack its declarations.
         """
+        editable = bool(getattr(self, "inplace", False))
+        if editable and not _EDITABLE_COMMANDS.intersection(sys.argv[1:]):
+            print(f"[build_py] <{DISPLAY_NAME}> in-place build: Cython include injection skipped")
+            return
         try:
             module = _load_cython_injection()
             status = module.inject_cython_includes(
                 PACKAGE_NAME,
                 source=Path(REPO_ROOT) / PACKAGE_NAME,
-                editable=bool(getattr(self, "inplace", False)),
+                editable=editable,
             )
             link = module.cython_injection_path(PACKAGE_NAME)
         except Exception as exc:
@@ -169,7 +178,16 @@ class BuildExtWithConfig(build_ext):
             return
 
         if status in (module.INJECTED, module.ALREADY_INJECTED) and link is not None:
-            print(f"[build_py] <{DISPLAY_NAME}> Cython/Includes/{PACKAGE_NAME} -> {os.readlink(link)}")
+            try:
+                target = os.readlink(link)
+            except OSError:
+                target = str(link)
+            print(f"[build_py] <{DISPLAY_NAME}> Cython/Includes/{PACKAGE_NAME} -> {target}")
+        elif status == module.SKIPPED_NO_CYTHON:
+            print(
+                f"[build_py] <{DISPLAY_NAME}> Cython is not installed in the target environment; "
+                f"Cython/Includes/{PACKAGE_NAME} injection skipped"
+            )
         else:
             print(f"[build_py] <{DISPLAY_NAME}> Cython include injection: {status}")
 
@@ -243,33 +261,38 @@ class BuildExtWithConfig(build_ext):
                 shutil.copyfile(infra_pxd, src_init_pxd)
 
 
-class BdistWheelWithCythonLink(_bdist_wheel):
-    """Record the injected Cython/Includes link in the wheel's RECORD.
+def _add_wheel_site_hook(wheel_path: Path) -> bool:
+    """Ship the startup hook that injects ``Cython/Includes`` on import."""
+    try:
+        module = _load_cython_injection()
+        return module.ensure_wheel_site_hook(
+            wheel_path,
+            Path(REPO_ROOT) / f"{module.SITE_HOOK_MODULE}.py",
+        )
+    except Exception as exc:
+        print(f"[build_py] <{DISPLAY_NAME}> Warning: could not add the Cython include startup hook: {exc}")
+        return False
 
-    pip removes a distribution's files using the paths in its ``RECORD``; the
-    link lives outside the package tree, so it must be listed there for
-    ``pip uninstall`` to remove it.
-    """
+
+class BdistWheelWithCythonLink(_bdist_wheel):
+    """Ship the startup hook that injects ``Cython/Includes`` on import."""
 
     def run(self):
         super().run()
         impl_tag, abi_tag, plat_tag = self.get_tag()
         wheel_name = f"{self.wheel_dist_name}-{impl_tag}-{abi_tag}-{plat_tag}.whl"
-        wheel_path = Path(self.dist_dir) / wheel_name
-        module = _load_cython_injection()
-        if not module.record_cython_include(wheel_path, PACKAGE_NAME):
-            print(f"[build_py] <{DISPLAY_NAME}> Warning: Cython include link not recorded in {wheel_name}")
+        if not _add_wheel_site_hook(Path(self.dist_dir) / wheel_name):
+            print(f"[build_py] <{DISPLAY_NAME}> Warning: Cython include startup hook not added to {wheel_name}")
 
 
 if _editable_wheel is not None:
     class EditableWheelWithCythonLink(_editable_wheel):
-        """Record the injected link in the PEP 660 editable wheel's RECORD."""
+        """Ship the startup hook in the PEP 660 editable wheel."""
 
         def _create_wheel_file(self, bdist_wheel):
             wheel_path = super()._create_wheel_file(bdist_wheel)
-            module = _load_cython_injection()
-            if not module.record_cython_include(wheel_path, PACKAGE_NAME):
-                print(f"[build_py] <{DISPLAY_NAME}> Warning: Cython include link not recorded in {wheel_path.name}")
+            if not _add_wheel_site_hook(Path(wheel_path)):
+                print(f"[build_py] <{DISPLAY_NAME}> Warning: Cython include startup hook not added to {Path(wheel_path).name}")
             return wheel_path
 
 # =============================
