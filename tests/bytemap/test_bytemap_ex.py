@@ -750,9 +750,16 @@ class TestBoundByteMapExDouble(unittest.TestCase):
         self.mapping["probe"] = 1.25
         forked = self.mapping.fork()
         value = forked["probe"]
+        self.assertIs(forked["probe"], value)
 
-        # refs: forked's dict + local value + getrefcount argument.
-        self.assertEqual(sys.getrefcount(value), 3)
+        # Compare against a plain dict holding an equivalent float rather than
+        # hardcoding a count: the view must own exactly one reference, just like
+        # the control dict. Absolute counts are interpreter-dependent - CPython
+        # 3.14 borrows operand-stack references, so a local passed as a call
+        # argument no longer adds a reference and getrefcount() reads one lower.
+        control_holder = {"probe": float(repr(value))}
+        control = control_holder["probe"]
+        self.assertEqual(sys.getrefcount(value), sys.getrefcount(control))
 
 
 class TestByteMapExPatchedBehavior(unittest.TestCase):
